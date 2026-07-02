@@ -1,0 +1,382 @@
+/*
+    Stremio browse screen -- implementation.
+
+    Built programmatically: a ScrollingFrame whose single content view is a
+    column Box. Each row = a Header + an HRecyclerFrame (horizontal poster
+    carousel) fed by StremioSource.
+*/
+#include "activity/stremio_home.hpp"
+#include "activity/stremio_series.hpp"
+#include "activity/stremio_detail.hpp"
+#include "activity/stremio_streams.hpp"
+#include "activity/stremio_search.hpp"
+#include "activity/stremio_favourites.hpp"
+#include "activity/stremio_resume.hpp"
+#include "view/recycling_grid.hpp"
+#include "view/h_recycling.hpp"
+#include "view/video_card.hpp"
+#include "view/svg_image.hpp"
+#include "utils/image.hpp"
+#include "utils/config.hpp"
+#include "api/stremio.hpp"
+
+#include <ctime>
+#include <memory>
+
+using namespace brls::literals;
+
+namespace {
+
+// First-run / on-demand prompt for the stream addon URL (on-screen keyboard).
+void promptForAddon(const std::string& initial) {
+    brls::Application::getImeManager()->openForText(
+        [](const std::string& text) {
+            std::string url = stremio::normalizeAddonUrl(text);
+            if (url.empty()) {
+                brls::Application::notify("No addon set — press − to set it later");
+                return;
+            }
+            stremio::saveAddon(AppConfig::instance().configDir(), url);
+            brls::Application::notify("Stream addon saved");
+        },
+        "Stream addon URL", "Paste your Stremio stream addon URL (with or without /manifest.json)", 1024, initial, 0);
+}
+
+// Consistent, polished styling for every row title (Continue Watching,
+// Favourites, and all catalog rows) — one place to tweak the look.
+void styleRowHeader(brls::Label* h, const std::string& text) {
+    h->setText(text);
+    h->setFontSize(27);
+    h->setMarginTop(28);
+    h->setMarginBottom(12);
+    h->setMarginLeft(6);
+    h->setTextColor(nvgRGB(240, 242, 248));  // soft white for clear hierarchy
+}
+
+// Data source: turns a list of Cinemeta metas into poster cards. Selecting a
+// movie opens the stream picker; selecting a series opens its episode list.
+class StremioSource : public RecyclingGridDataSource {
+public:
+    explicit StremioSource(const std::vector<stremio::Meta>& r) : list(std::move(r)) {}
+
+    size_t getItemCount() override { return this->list.size(); }
+
+    RecyclingGridItem* cellForRow(RecyclingView* recycler, size_t index) override {
+        FavCardCell* cell = dynamic_cast<FavCardCell*>(recycler->dequeueReusableCell("Cell"));
+        auto item = this->list.at(index);
+
+        cell->labelTitle->setText(item.name);
+        if (item.year.empty()) {
+            cell->labelExt->setVisibility(brls::Visibility::GONE);
+        } else {
+            cell->labelExt->setText(item.year);
+            cell->labelExt->setVisibility(brls::Visibility::VISIBLE);
+        }
+        cell->labelRating->setVisibility(brls::Visibility::INVISIBLE);
+        cell->badgeTopRight->setVisibility(brls::Visibility::GONE);
+        cell->rectProgress->getParent()->setVisibility(brls::Visibility::GONE);
+
+        // Heart badge reflects favourite state; X toggles it.
+        bool fav = Favourites::instance().contains(item.id);
+        cell->badgeFavorite->setVisibility(fav ? brls::Visibility::VISIBLE : brls::Visibility::INVISIBLE);
+        cell->onToggleFav = [item, cell]() {
+            bool nowFav = Favourites::instance().toggle(item);
+            cell->badgeFavorite->setVisibility(nowFav ? brls::Visibility::VISIBLE : brls::Visibility::INVISIBLE);
+            brls::Application::notify(nowFav ? "Added to Favourites" : "Removed from Favourites");
+        };
+
+        if (!item.poster.empty()) Image::with(cell->picture, item.poster);
+
+        return cell;
+    }
+
+    void onItemSelected(brls::Box* recycler, size_t index) override {
+        auto item = this->list.at(index);
+        // Both movies and series open the detail screen (info + cast +
+        // Watch/Episodes button).
+        brls::Application::pushActivity(new brls::Activity(new StremioDetail(item)), brls::TransitionAnimation::NONE);
+    }
+
+    void clearData() override { this->list.clear(); }
+
+private:
+    std::vector<stremio::Meta> list;
+};
+
+// Continue Watching: poster cards with a progress bar; selecting one fetches
+// streams and resumes where you left off.
+class ContinueSource : public RecyclingGridDataSource {
+public:
+    explicit ContinueSource(const std::vector<ResumeEntry>& r) : list(r) {}
+
+    size_t getItemCount() override { return this->list.size(); }
+
+    RecyclingGridItem* cellForRow(RecyclingView* recycler, size_t index) override {
+        FavCardCell* cell = dynamic_cast<FavCardCell*>(recycler->dequeueReusableCell("Cell"));
+        auto& e = this->list.at(index);
+
+        cell->labelTitle->setText(e.name);
+        cell->labelExt->setVisibility(brls::Visibility::GONE);
+        cell->labelRating->setVisibility(brls::Visibility::INVISIBLE);
+        cell->badgeFavorite->setVisibility(brls::Visibility::INVISIBLE);
+        cell->badgeTopRight->setVisibility(brls::Visibility::GONE);
+        // X clears this item from Continue Watching. Deferred to the next frame
+        // so the button press finishes before the row tears down and rebuilds.
+        cell->onToggleFav = [id = e.streamId]() {
+            brls::sync([id]() {
+                ResumeTracker::instance().remove(id);
+                brls::Application::notify("Removed from Continue Watching");
+            });
+        };
+
+        if (e.duration > 0) {
+            cell->rectProgress->setWidthPercentage((float)(e.position / e.duration * 100.0));
+            cell->rectProgress->getParent()->setVisibility(brls::Visibility::VISIBLE);
+        } else {
+            cell->rectProgress->getParent()->setVisibility(brls::Visibility::GONE);
+        }
+
+        if (!e.poster.empty()) Image::with(cell->picture, e.poster);
+
+        return cell;
+    }
+
+    void onItemSelected(brls::Box* recycler, size_t index) override {
+        auto e = this->list.at(index);
+        if (stremio::STREAM_ADDON.empty()) {
+            brls::Application::notify("Set your stream addon first (press −)");
+            return;
+        }
+        brls::Application::notify("Finding streams…");
+        std::string url = stremio::STREAM_ADDON + "/stream/" + e.streamType + "/" + e.streamId + ".json";
+        stremio::getJSON<stremio::StreamList>(
+            [e](stremio::StreamList r) {
+                if (r.streams.empty()) {
+                    brls::Application::notify("No streams found");
+                    return;
+                }
+                brls::Application::pushActivity(new brls::Activity(new StreamPicker(e.name, r.streams, e)));
+            },
+            [](const std::string& err) { brls::Application::notify("Stream error: " + err); }, url);
+    }
+
+    void clearData() override { this->list.clear(); }
+
+private:
+    std::vector<ResumeEntry> list;
+};
+
+}  // namespace
+
+StremioHome::StremioHome() {
+    brls::Logger::debug("StremioHome: create");
+    this->setAxis(brls::Axis::COLUMN);
+    this->setDimensions(brls::Application::contentWidth, brls::Application::contentHeight);
+    this->setBackgroundColor(nvgRGB(16, 18, 24));  // deep cinematic slate
+
+    auto* scroll = new brls::ScrollingFrame();
+    scroll->setGrow(1.0f);
+    scroll->setScrollingIndicatorVisible(false);
+
+    this->boxHome = new brls::Box();
+    this->boxHome->setAxis(brls::Axis::COLUMN);
+    this->boxHome->setPadding(16, 50, 32, 50);  // more breathing room at the edges
+    scroll->setContentView(this->boxHome);
+
+    this->addView(scroll);
+
+    // Continue Watching (very top) + Favourites rows — both hidden until non-empty.
+    Favourites::instance().load();
+    ResumeTracker::instance().init();
+    this->addContinueRow();
+    this->addFavouritesRow();
+
+    // Cinemeta catalogs: top = Popular, year = New (newest releases),
+    // imdbRating = Top Rated. The /year catalog requires a year value.
+    this->addRow("Popular Movies", stremio::CINEMETA + "/catalog/movie/top.json");
+    this->addRow("Popular Series", stremio::CINEMETA + "/catalog/series/top.json");
+    // Current year computed at runtime, so "New" auto-rolls each year (no manual edit).
+    std::time_t now = std::time(nullptr);
+    std::string year = std::to_string(1900 + std::localtime(&now)->tm_year);
+    this->addRow("New Movies", stremio::CINEMETA + "/catalog/movie/year/genre=" + year + ".json");
+    this->addRow("New Series", stremio::CINEMETA + "/catalog/series/year/genre=" + year + ".json");
+    this->addRow("Top Rated Movies", stremio::CINEMETA + "/catalog/movie/imdbRating.json");
+    this->addRow("Top Rated Series", stremio::CINEMETA + "/catalog/series/imdbRating.json");
+    this->addRow("Animation Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Animation.json");
+    this->addRow("Animation Series", stremio::CINEMETA + "/catalog/series/top/genre=Animation.json");
+    this->addRow("Documentary Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Documentary.json");
+    this->addRow("Documentary Series", stremio::CINEMETA + "/catalog/series/top/genre=Documentary.json");
+
+    // Y opens the on-screen keyboard to search Cinemeta.
+    this->registerAction("Search", brls::BUTTON_Y, [](brls::View*) {
+        brls::Application::getImeManager()->openForText(
+            [](const std::string& text) {
+                if (!text.empty())
+                    brls::Application::pushActivity(new brls::Activity(new StremioSearch(text)));
+            },
+            "Search movies & series", "", 64, "", 0);
+        return true;
+    });
+
+    // − sets/changes the stream addon URL; also prompts automatically on
+    // first launch (deferred a frame so the window is up).
+    this->registerAction("Stream Addon", brls::BUTTON_BACK, [](brls::View*) {
+        promptForAddon(stremio::STREAM_ADDON);
+        return true;
+    });
+    if (stremio::STREAM_ADDON.empty())
+        brls::sync([]() { promptForAddon(""); });
+}
+
+void StremioHome::addRow(const std::string& title, const std::string& url) {
+    auto* header = new brls::Label();
+    styleRowHeader(header, title);
+    this->boxHome->addView(header);
+
+    auto* rec = new HRecyclerFrame();
+    rec->setHeight(300);
+    rec->estimatedRowWidth = 175;
+    rec->registerCell("Cell", FavCardCell::create);
+    this->boxHome->addView(rec);
+    if (!this->firstRowRec) this->firstRowRec = rec;  // safe parking spot for focus
+    rec->showSkeleton(8);
+
+    ASYNC_RETAIN
+    stremio::getJSON<stremio::MetaList>(
+        [ASYNC_TOKEN, rec](stremio::MetaList r) {
+            ASYNC_RELEASE
+            if (!r.metas.empty()) rec->setDataSource(new StremioSource(r.metas));
+        },
+        [ASYNC_TOKEN, rec](const std::string&) { ASYNC_RELEASE },
+        url);
+}
+
+void StremioHome::addFavouritesRow() {
+    this->favHeader = new brls::Label();
+    styleRowHeader(this->favHeader, "Favourites");
+    this->boxHome->addView(this->favHeader);
+
+    this->favRec = new HRecyclerFrame();
+    this->favRec->setHeight(300);
+    this->favRec->estimatedRowWidth = 175;
+    this->favRec->registerCell("Cell", FavCardCell::create);
+    this->boxHome->addView(this->favRec);
+
+    Favourites::instance().changed()->subscribe([this]() { this->refreshFavourites(); });
+    this->refreshFavourites();
+}
+
+void StremioHome::refreshFavourites() {
+    auto& favs = Favourites::instance().all();
+    if (favs.empty()) {
+        this->favHeader->setVisibility(brls::Visibility::GONE);
+        this->favRec->setVisibility(brls::Visibility::GONE);
+    } else {
+        this->favHeader->setVisibility(brls::Visibility::VISIBLE);
+        this->favRec->setVisibility(brls::Visibility::VISIBLE);
+        this->favRec->setDataSource(new StremioSource(favs));
+    }
+}
+
+void StremioHome::addContinueRow() {
+    this->continueHeader = new brls::Label();
+    styleRowHeader(this->continueHeader, "Continue Watching");
+    this->boxHome->addView(this->continueHeader);
+
+    this->continueRec = new HRecyclerFrame();
+    this->continueRec->setHeight(300);
+    this->continueRec->estimatedRowWidth = 175;
+    this->continueRec->registerCell("Cell", FavCardCell::create);
+    this->boxHome->addView(this->continueRec);
+
+    ResumeTracker::instance().changed()->subscribe([this]() { this->refreshContinue(); });
+    this->refreshContinue();
+}
+
+void StremioHome::refreshContinue() {
+    // Was focus inside this row? (true when the user just cleared an item;
+    // false when the row is refreshing because playback stopped elsewhere.)
+    bool focusHere = false;
+    for (brls::View* f = brls::Application::getCurrentFocus(); f != nullptr; f = f->getParent())
+        if (f == this->continueRec) {
+            focusHere = true;
+            break;
+        }
+
+    // Park focus on a stable row BEFORE we tear down the old cells, so the focus
+    // highlight is never left pointing at a cell that's about to be destroyed.
+    if (focusHere && this->firstRowRec) brls::Application::giveFocus(this->firstRowRec);
+
+    auto cw = ResumeTracker::instance().continueWatching();
+    if (cw.empty()) {
+        this->continueHeader->setVisibility(brls::Visibility::GONE);
+        this->continueRec->setVisibility(brls::Visibility::GONE);
+        // Row is gone now; leave focus on the parked row.
+    } else {
+        this->continueHeader->setVisibility(brls::Visibility::VISIBLE);
+        this->continueRec->setVisibility(brls::Visibility::VISIBLE);
+        this->continueRec->setDataSource(new ContinueSource(cw));
+        if (focusHere) brls::sync([this]() { brls::Application::giveFocus(this->continueRec); });
+        this->enrichContinue();  // resolve any non-English / stale titles, then rebuild once
+    }
+}
+
+// Resolve English titles (and series "Name · S1E5") from Cinemeta for any
+// Continue-Watching entry not yet enriched, persist them, and rebuild the row
+// once when done. Only ever touches the (retained) activity and its row — never
+// a recycled cell pointer — so it's safe against scrolling/teardown.
+void StremioHome::enrichContinue() {
+    if (this->continueEnriching) return;  // a pass is already running
+
+    // Movies only: this fixes localized/original-language movie titles (e.g. a
+    // Polish title) by pulling the English name from Cinemeta. Series already
+    // get a clean English "Series · S1E5 · Episode" label built on the series
+    // screen, and we don't want to shorten that here.
+    auto cw = ResumeTracker::instance().continueWatching();
+    std::vector<ResumeEntry> todo;
+    for (auto& e : cw)
+        if (!e.enriched && e.streamType == "movie") todo.push_back(e);
+    if (todo.empty()) return;
+
+    this->continueEnriching = true;
+    auto pending = std::make_shared<int>((int)todo.size());
+    auto changed = std::make_shared<bool>(false);
+
+    auto finalize = [this, changed]() {
+        this->continueEnriching = false;
+        if (!*changed) return;
+        auto fresh = ResumeTracker::instance().continueWatching();
+        if (fresh.empty()) return;
+        bool focusHere = false;
+        for (brls::View* f = brls::Application::getCurrentFocus(); f != nullptr; f = f->getParent())
+            if (f == this->continueRec) {
+                focusHere = true;
+                break;
+            }
+        if (focusHere && this->firstRowRec) brls::Application::giveFocus(this->firstRowRec);
+        this->continueRec->setDataSource(new ContinueSource(fresh));
+        if (focusHere) brls::sync([this]() { brls::Application::giveFocus(this->continueRec); });
+    };
+
+    for (auto& e : todo) {
+        const std::string id = e.streamId;  // movie id == ttID (no ":season:episode")
+        const std::string oldName = e.name;
+
+        std::string url = stremio::CINEMETA + "/meta/movie/" + id + ".json";
+        ASYNC_RETAIN
+        stremio::getJSON<stremio::MetaResult>(
+            [ASYNC_TOKEN, id, oldName, pending, changed, finalize](stremio::MetaResult r) {
+                ASYNC_RELEASE
+                if (!r.meta.name.empty()) {
+                    ResumeTracker::instance().updateMeta(id, r.meta.name, "");
+                    if (r.meta.name != oldName) *changed = true;
+                }
+                if (--(*pending) == 0) finalize();
+            },
+            [ASYNC_TOKEN, pending, finalize](const std::string&) {
+                ASYNC_RELEASE
+                if (--(*pending) == 0) finalize();
+            },
+            url);
+    }
+}
