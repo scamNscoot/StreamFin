@@ -79,6 +79,11 @@ ninja -C build_switch StreamFin.nro
 - [borealis](https://github.com/natinusala/borealis) — Switch-style UI library
 - [Stremio](https://www.stremio.com/) — the addon protocol and the public Cinemeta catalog
 
+## Contact
+
+Bugs and feature requests: please [open an issue](https://github.com/scamNscoot/StreamFin/issues).
+Anything else: scamnscoot@outlook.com
+
 ## Disclaimer
 
 This app is a generic client for the open Stremio addon protocol. It ships with no media and no
