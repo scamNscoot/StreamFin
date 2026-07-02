@@ -8,6 +8,18 @@ Browse Cinemeta catalogs, search, open a title page with cast & plot, pick a str
 all natively on the Switch with MPV. No content is included: **you bring your own Stremio stream
 addon URL**, which the app asks for on first launch.
 
+## Screenshots
+
+| Home | Title details |
+|---|---|
+| ![Home screen](images/home.jpg) | ![Title details](images/detail.jpg) |
+
+| Playback | On the home menu |
+|---|---|
+| ![Player](images/player.jpg) | ![hbmenu](images/hbmenu.jpg) |
+
+![Season list](images/seasons.jpg)
+
 ## Features
 
 - **Home screen** — poster carousels: Popular / New / Top Rated / Animation / Documentary,
