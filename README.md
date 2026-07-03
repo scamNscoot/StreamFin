@@ -12,15 +12,15 @@ addon URL**, which the app asks for on first launch.
 
 | Home | Title details |
 |---|---|
-| ![Home screen](images/home.jpg) | ![Title details](images/detail.jpg) |
+| ![Home screen](images/capture-home.jpg) | ![Title details](images/capture-detail.jpg) |
 
 | Episodes | Playback |
 |---|---|
-| ![Episode list](images/episodes.jpg) | ![Player](images/player.jpg) |
+| ![Episode list](images/capture-episodes.jpg) | ![Player](images/capture-player.jpg) |
 
 | Season list | On the home menu |
 |---|---|
-| ![Season list](images/seasons.jpg) | ![hbmenu](images/hbmenu.jpg) |
+| ![Season list](images/capture-seasons.jpg) | ![hbmenu](images/capture-hbmenu.jpg) |
 
 ## Features
 
