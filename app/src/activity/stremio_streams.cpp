@@ -179,7 +179,20 @@ StreamPicker::StreamPicker(
     this->recycler->registerCell("Cell", []() -> RecyclingGridItem* { return new StreamCell(); });
     this->addView(this->recycler);
 
-    this->recycler->setDataSource(new StreamSource(resumeKey, streams));
+    // Addons (e.g. AIOStreams) may return non-playable info entries alongside
+    // real streams — "Removal Reasons", "no results", etc. — with no URL.
+    // Keep only playable streams so the user can't select a dead entry.
+    std::vector<stremio::Stream> playable;
+    for (auto& s : streams)
+        if (!s.url.empty()) playable.push_back(s);
+
+    if (playable.empty()) {
+        // Everything the addon offered was filtered out (often by the addon's
+        // own quality/resolution filters). Point the user at the real cause.
+        this->recycler->setEmpty("No playable streams — check your addon's quality/resolution filters");
+    } else {
+        this->recycler->setDataSource(new StreamSource(resumeKey, playable));
+    }
     // Defer focus until after the activity is on screen.
     brls::sync([this]() { brls::Application::giveFocus(this->recycler); });
 
