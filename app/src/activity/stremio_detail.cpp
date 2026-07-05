@@ -23,7 +23,7 @@ namespace {
 const NVGcolor COL_BG     = nvgRGB(16, 18, 24);    // cinematic slate
 const NVGcolor COL_TEXT   = nvgRGB(240, 242, 248); // soft white
 const NVGcolor COL_DIM    = nvgRGB(168, 176, 192); // secondary text
-const NVGcolor COL_ACCENT = nvgRGB(255, 200, 80);  // rating star
+const NVGcolor COL_ACCENT = nvgRGB(245, 33, 42);   // StreamFin brand red (meta line)
 
 // Join a string list: {"A","B"} -> "A, B".
 std::string join(const std::vector<std::string>& v, const char* sep = ", ") {
@@ -103,7 +103,7 @@ StremioDetail::StremioDetail(const stremio::Meta& item) : item(item) {
     this->btnWatch->setAxis(brls::Axis::ROW);
     this->btnWatch->setPadding(14, 40, 14, 40);
     this->btnWatch->setCornerRadius(8);
-    this->btnWatch->setBackgroundColor(nvgRGBA(255, 255, 255, 24));
+    this->btnWatch->setBackgroundColor(COL_ACCENT);  // brand red
     auto* btnLabel = new brls::Label();
     // ▶ is in the Switch system font; ☰ is not (renders as a crossed box).
     btnLabel->setText(item.type == "series" ? "▶  Episodes" : "▶  Watch");

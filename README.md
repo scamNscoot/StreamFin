@@ -1,4 +1,8 @@
-# StreamFin
+<p align="center">
+  <img src="images/logo.png" alt="StreamFin" width="180" />
+</p>
+
+<h1 align="center">StreamFin</h1>
 
 A **streaming-only Stremio client for homebrewed Nintendo Switch**, built by forking
 [Switchfin](https://github.com/dragonflylee/switchfin) and replacing its Jellyfin data layer with
@@ -16,7 +20,7 @@ addon URL**, which the app asks for on first launch.
 
 | Episodes | Playback |
 |---|---|
-| ![Episode list](images/capture-episodes.jpg) | ![Player](images/capture-player.jpg) |
+| ![Episode list](images/capture-episodes.jpg) | ![Player](images/capture-play.jpg) |
 
 | Season list | On the home menu |
 |---|---|
