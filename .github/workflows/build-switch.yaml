@@ -1,0 +1,49 @@
+name: Build Switch NRO
+
+on:
+  push:
+    branches: [main, "claude/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-nx:
+    runs-on: ubuntu-latest
+    container:
+      image: devkitpro/devkita64:20260219
+    env:
+      BASE_URL: https://github.com/dragonflylee/switchfin/releases/download/switch-portlibs
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    - name: Install portlibs
+      run: |
+        for pkg in mbedtls-3.6.5-1 libssh2-1.11.1-1 dav1d-1.5.3-1 curl-8.16.0-2 ffmpeg-7.1.5-5 libmpv-0.36.0-5; do
+          dkp-pacman --noconfirm -U $BASE_URL/switch-${pkg}-any.pkg.tar.zst
+        done
+        git config --system --add safe.directory $GITHUB_WORKSPACE
+    - name: Build nro
+      run: |
+        cmake -B build \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DPLATFORM_SWITCH=ON \
+          -DBUILTIN_NSP=OFF \
+          -DVERSION_BUILD=${{ github.run_number }}
+        make -C build StreamFin.nro -j$(nproc)
+    - name: Upload nro artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: StreamFin-NintendoSwitch
+        path: build/StreamFin.nro
+    - name: Release
+      uses: softprops/action-gh-release@v2
+      with:
+        name: StreamFinEX v0.3.0
+        tag_name: v0.3.0
+        files: build/StreamFin.nro
+        body: |
+          Stremio ocean theme, column-true row navigation, focus glow, official Stremio icon.
+          Copy `StreamFin.nro` to `/switch/` on your SD card.
