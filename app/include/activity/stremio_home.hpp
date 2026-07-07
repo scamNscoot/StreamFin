@@ -16,6 +16,10 @@ class StremioHome : public brls::Box {
 public:
     StremioHome();
 
+    // Paints the shared ocean-gradient background behind the rows.
+    void draw(NVGcontext* vg, float x, float y, float width, float height, brls::Style style,
+        brls::FrameContext* ctx) override;
+
 private:
     void addRow(const std::string& title, const std::string& url);
     void addFavouritesRow();

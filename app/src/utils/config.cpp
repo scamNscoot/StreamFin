@@ -413,7 +413,11 @@ bool AppConfig::init() {
             DanmakuCore::DANMAKU_FONT = brls::Application::getDefaultFont();
         }
         // 初始化主题
-        std::string appTheme = this->getItem(APP_THEME, std::string("auto"));
+        // Default to dark: the Stremio screens paint a dark ocean backdrop, so
+        // light-theme widgets (white highlight pill, pale skeletons) clash on
+        // consoles/desktops set to a light system theme. "auto"/"light" remain
+        // selectable in settings.
+        std::string appTheme = this->getItem(APP_THEME, std::string("dark"));
         if (appTheme == "light") {
             brls::Application::getPlatform()->setThemeVariant(brls::ThemeVariant::LIGHT);
         } else if (appTheme == "dark") {
@@ -774,14 +778,14 @@ void AppConfig::addColor(const brls::ThemeVariant tv, const std::string& name, N
 }
 
 void AppConfig::initThemes() {
-    this->addColor(brls::ThemeVariant::LIGHT, "color/app", nvgRGB(2, 176, 183));
-    this->addColor(brls::ThemeVariant::DARK, "color/app", nvgRGB(51, 186, 227));
+    this->addColor(brls::ThemeVariant::LIGHT, "color/app", nvgRGB(96, 84, 230));
+    this->addColor(brls::ThemeVariant::DARK, "color/app", nvgRGB(124, 108, 255));
     // metadata pills (detail pages)
     this->addColor(brls::ThemeVariant::LIGHT, "color/pill", nvgRGBA(0, 0, 0, 18));
     this->addColor(brls::ThemeVariant::DARK, "color/pill", nvgRGBA(255, 255, 255, 22));
     // surfaces placed over the background (content cards, PIN code panel...)
     this->addColor(brls::ThemeVariant::LIGHT, "color/surface", nvgRGB(255, 255, 255));
-    this->addColor(brls::ThemeVariant::DARK, "color/surface", nvgRGB(22, 24, 29));
+    this->addColor(brls::ThemeVariant::DARK, "color/surface", nvgRGB(21, 26, 45));
     // 用于骨架屏背景色
     this->addColor(brls::ThemeVariant::LIGHT, "color/grey_1", nvgRGB(245, 246, 247));
     this->addColor(brls::ThemeVariant::DARK, "color/grey_1", nvgRGB(51, 52, 53));

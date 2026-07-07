@@ -1,30 +1,39 @@
 <p align="center">
-  <img src="images/logo.jpg" alt="StreamFin" width="180" />
+  <img src="images/logo.png" alt="StreamFinEX" width="160" />
 </p>
 
-<h1 align="center">StreamFin</h1>
+<h1 align="center">StreamFinEX</h1>
 
-A **streaming-only Stremio client for homebrewed Nintendo Switch**, built by forking
-[Switchfin](https://github.com/dragonflylee/switchfin) and replacing its Jellyfin data layer with
-the [Stremio addon protocol](https://github.com/Stremio/stremio-addon-sdk/blob/master/docs/protocol.md).
+A **streaming-only Stremio client for homebrewed Nintendo Switch**. This is a fork of
+[StreamFin](https://github.com/scamNscoot/StreamFin) (itself built on
+[Switchfin](https://github.com/dragonflylee/switchfin), with the Jellyfin data layer replaced by
+the [Stremio addon protocol](https://github.com/Stremio/stremio-addon-sdk/blob/master/docs/protocol.md)),
+focused on making the experience look and feel like **actual Stremio**: dark ocean blue/purple
+theme, Stremio-style focus glow, and smarter controller navigation.
 
 Browse Cinemeta catalogs, search, open a title page with cast & plot, pick a stream, and play —
 all natively on the Switch with MPV. No content is included: **you bring your own Stremio stream
 addon URL**, which the app asks for on first launch.
 
+## What this fork changes (v0.3.0)
+
+- **Stremio-style theme** — dark ocean-navy gradient background with purple/blue washes, purple
+  accents, and the focus outline pulsing between ocean blue and Stremio purple with a soft glow
+- **Column-true navigation** — moving between rows lands on the poster directly above/below the
+  one you're on (shorter rows clamp to their closest poster), and each press hops exactly one row
+- **Focus outline fixes** — the outline no longer fades away while you rest on a poster
+
 ## Screenshots
 
-| Home | Title details |
+| Home (ocean theme) | Title details |
 |---|---|
 | ![Home screen](images/capture-home.jpg) | ![Title details](images/capture-detail.jpg) |
+
+*(theme previews captured on the desktop build with placeholder posters)*
 
 | Episodes | Playback |
 |---|---|
 | ![Episode list](images/capture-episodes.jpg) | ![Player](images/capture-play.jpg) |
-
-| Season list | On the home menu |
-|---|---|
-| ![Season list](images/capture-seasons.jpg) | ![hbmenu](images/capture-home-menu.jpg) |
 
 ## Features
 
@@ -43,7 +52,7 @@ addon URL**, which the app asks for on first launch.
 2. **Recommended:** while the SD card is still in your PC, create a plain-text file at
    `/switch/streamfin-addon.txt` containing your **stream addon URL** — the base URL of any
    Stremio addon that implements the `stream` resource (with or without `/manifest.json`).
-   StreamFin imports it automatically at launch — no typing on the console. Editing the file
+   StreamFinEX imports it automatically at launch — no typing on the console. Editing the file
    later updates the settings too. Full format (all lines optional, `#` for comments):
 
    ```
@@ -81,7 +90,7 @@ Embedded subtitle tracks always work out of the box. To also pull subtitles from
 subtitles=https://your-subtitles-addon.example.com/...
 ```
 
-When playback starts, StreamFin fetches subtitles for that exact title/episode and adds them to
+When playback starts, StreamFinEX fetches subtitles for that exact title/episode and adds them to
 the player — pick one under **+ → Subtitle** (one per language, alongside any embedded tracks).
 
 ## Controls
@@ -112,15 +121,17 @@ ninja -C build_switch StreamFin.nro
 
 ## Credits
 
-- [Switchfin](https://github.com/dragonflylee/switchfin) by dragonflylee — the base app this
-  project forks (player, UI framework integration, build system)
+- [StreamFin](https://github.com/scamNscoot/StreamFin) by scamNscoot — the Stremio-on-Switch
+  base this repository forks
+- [Switchfin](https://github.com/dragonflylee/switchfin) by dragonflylee — the original app
+  (player, UI framework integration, build system)
 - [borealis](https://github.com/natinusala/borealis) — Switch-style UI library
-- [Stremio](https://www.stremio.com/) — the addon protocol and the public Cinemeta catalog
+- [Stremio](https://www.stremio.com/) — the addon protocol, the public Cinemeta catalog, and the
+  logo used for the app icon
 
 ## Contact
 
-Bugs and feature requests: please [open an issue](https://github.com/scamNscoot/StreamFin/issues).
-Anything else: scamnscoot@outlook.com
+Bugs and feature requests: please [open an issue](https://github.com/Kirbosh/StreamFinEX/issues).
 
 ## Disclaimer
 

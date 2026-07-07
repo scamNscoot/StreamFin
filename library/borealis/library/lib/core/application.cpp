@@ -165,22 +165,6 @@ bool Application::mainLoop()
     return Application::platform->runLoop(internalMainLoop);
 }
 
-// --- Focus highlight idle fade (Stremio build) ---
-// The blue focus border stays visible while you're using the controls, then
-// fades out after a short idle so the screen looks clean. Any button / dpad /
-// stick activity stamps s_lastGamepadInput, which snaps the border back.
-static Time s_lastGamepadInput = 0;
-static float highlightIdleAlpha(Time now)
-{
-    if (s_lastGamepadInput == 0) s_lastGamepadInput = now;  // visible on first frame
-    Time idle = now - s_lastGamepadInput;
-    const Time visibleFor = 800000;   // 0.8s fully visible
-    const Time fadeOver   = 400000;   // 0.4s fade to invisible
-    if (idle <= visibleFor) return 1.0f;
-    if (idle >= visibleFor + fadeOver) return 0.0f;
-    return 1.0f - (float)(idle - visibleFor) / (float)fadeOver;
-}
-
 bool Application::internalMainLoop()
 {
     Application::updateFPS();
@@ -403,7 +387,6 @@ void Application::processInput()
     {
         if (controllerState.buttons[i])
         {
-            s_lastGamepadInput = cpuTime;  // wake the focus highlight
             repeating = controllerState.repeatingButtonStop[i] > 0 && cpuTime > controllerState.repeatingButtonStop[i];
 
             if (repeating)
@@ -449,7 +432,6 @@ void Application::processInput()
 
         if (watchedKey.pressed)
         {
-            s_lastGamepadInput = cpuTime;  // wake the focus highlight (keyboard)
             repeating = watchedKey.repeatingStop > 0 && cpuTime > watchedKey.repeatingStop;
 
             if (repeating)
@@ -804,15 +786,7 @@ void Application::frame()
     }
 
     if (currentFocus && Application::getInputType() != InputType::TOUCH)
-    {
-        float ha = highlightIdleAlpha(Application::frameStartTime);
-        if (ha > 0.001f)
-        {
-            nvgGlobalAlpha(frameContext.vg, ha);
-            currentFocus->frameHighlight(&frameContext);
-            nvgGlobalAlpha(frameContext.vg, 1.0f);
-        }
-    }
+        currentFocus->frameHighlight(&frameContext);
 
     // Notifications
     Application::notificationManager->frame(&frameContext);

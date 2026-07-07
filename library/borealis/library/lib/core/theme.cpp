@@ -29,13 +29,13 @@ static ThemeValues lightThemeValues = {
     { "brls/text", nvgRGB(45, 45, 45) },
     { "brls/text_disabled", nvgRGB(140, 140, 140) },
     { "brls/backdrop", nvgRGBA(0, 0, 0, 178) },
-    { "brls/click_pulse", nvgRGBA(245, 33, 42, 38) }, // StreamFin brand red, low opacity
-    { "brls/accent", nvgRGB(245, 33, 42) },
+    { "brls/click_pulse", nvgRGBA(123, 91, 245, 38) }, // Stremio purple, low opacity
+    { "brls/accent", nvgRGB(123, 91, 245) },
 
-    // Highlight — StreamFin brand red (matches the app logo)
+    // Highlight — Stremio ocean blue / purple (border breathes between the two)
     { "brls/highlight/background", nvgRGB(252, 255, 248) },
-    { "brls/highlight/color1", nvgRGB(245, 33, 42) },
-    { "brls/highlight/color2", nvgRGB(255, 110, 90) },
+    { "brls/highlight/color1", nvgRGB(72, 130, 255) },
+    { "brls/highlight/color2", nvgRGB(148, 102, 255) },
 
     // AppletFrame
     { "brls/applet_frame/separator", nvgRGB(45, 45, 45) },
@@ -82,27 +82,27 @@ static ThemeValues lightThemeValues = {
 };
 
 static ThemeValues darkThemeValues = {
-    // Generic values
-    { "brls/clear", nvgRGB(45, 45, 45) },
-    { "brls/background", nvgRGB(45, 45, 45) },
+    // Generic values — deep ocean navy base (Stremio-style)
+    { "brls/clear", nvgRGB(10, 13, 26) },
+    { "brls/background", nvgRGB(10, 13, 26) },
     { "brls/text", nvgRGB(255, 255, 255) },
     { "brls/text_disabled", nvgRGB(80, 80, 80) },
     { "brls/backdrop", nvgRGBA(0, 0, 0, 178) },
-    { "brls/click_pulse", nvgRGBA(245, 33, 42, 38) }, // StreamFin brand red, low opacity
-    { "brls/accent", nvgRGB(245, 33, 42) },
+    { "brls/click_pulse", nvgRGBA(123, 91, 245, 38) }, // Stremio purple, low opacity
+    { "brls/accent", nvgRGB(123, 91, 245) },
 
-    // Highlight — StreamFin brand red (matches the app logo)
-    { "brls/highlight/background", nvgRGB(31, 34, 39) },
-    { "brls/highlight/color1", nvgRGB(245, 33, 42) },
-    { "brls/highlight/color2", nvgRGB(255, 120, 100) },
+    // Highlight — Stremio ocean blue / purple (border breathes between the two)
+    { "brls/highlight/background", nvgRGB(26, 30, 52) },
+    { "brls/highlight/color1", nvgRGB(72, 130, 255) },
+    { "brls/highlight/color2", nvgRGB(148, 102, 255) },
 
     // AppletFrame
     { "brls/applet_frame/separator", nvgRGB(255, 255, 255) },
 
     // Sidebar
-    { "brls/sidebar/background", nvgRGB(50, 50, 50) },
-    { "brls/sidebar/active_item", nvgRGB(0, 255, 204) },
-    { "brls/sidebar/separator", nvgRGB(81, 81, 81) },
+    { "brls/sidebar/background", nvgRGB(17, 21, 38) },
+    { "brls/sidebar/active_item", nvgRGB(148, 118, 255) },
+    { "brls/sidebar/separator", nvgRGB(58, 63, 90) },
 
     // Header
     { "brls/header/border", nvgRGB(78, 78, 78) },
@@ -110,9 +110,9 @@ static ThemeValues darkThemeValues = {
     { "brls/header/subtitle", nvgRGB(163, 163, 163) },
 
     // Button
-    { "brls/button/primary_enabled_background", nvgRGB(1, 255, 201) },
+    { "brls/button/primary_enabled_background", nvgRGB(123, 91, 245) },
     { "brls/button/primary_disabled_background", nvgRGB(83, 87, 86) },
-    { "brls/button/primary_enabled_text", nvgRGB(52, 41, 55) },
+    { "brls/button/primary_enabled_text", nvgRGB(240, 242, 248) },
     { "brls/button/primary_disabled_text", nvgRGB(71, 75, 74) },
 
     { "brls/button/default_enabled_background", nvgRGB(80, 80, 80) },
@@ -120,19 +120,19 @@ static ThemeValues darkThemeValues = {
     { "brls/button/default_enabled_text", nvgRGB(255, 255, 255) },
     { "brls/button/default_disabled_text", nvgRGB(255, 255, 255) },
 
-    { "brls/button/highlight_enabled_text", nvgRGB(7, 247, 198) },
-    { "brls/button/highlight_disabled_text", nvgRGB(7, 247, 198) },
+    { "brls/button/highlight_enabled_text", nvgRGB(150, 130, 255) },
+    { "brls/button/highlight_disabled_text", nvgRGB(150, 130, 255) },
 
     { "brls/button/enabled_border_color", nvgRGB(255, 255, 255) },
     { "brls/button/disabled_border_color", nvgRGB(255, 255, 255) },
 
     // List
-    { "brls/list/listItem_value_color", nvgRGB(88, 195, 169) },
+    { "brls/list/listItem_value_color", nvgRGB(130, 150, 255) },
 
     // Slider
     { "brls/slider/pointer_color", nvgRGB(80, 80, 80) },
     { "brls/slider/pointer_border_color", nvgRGB(120, 120, 120) },
-    { "brls/slider/line_filled", nvgRGB(1, 255, 201) },
+    { "brls/slider/line_filled", nvgRGB(123, 91, 245) },
     { "brls/slider/line_empty", nvgRGB(140, 140, 140) },
 
     // Spinner

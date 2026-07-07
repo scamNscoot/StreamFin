@@ -1,5 +1,7 @@
 #include "view/h_recycling.hpp"
 
+#include <cmath>
+
 brls::View* HRecyclerFrame::getNextCellFocus(brls::FocusDirection direction, brls::View* currentView) {
     void* parentUserData = currentView->getParentUserData();
 
@@ -73,8 +75,42 @@ HRecyclerFrame::~HRecyclerFrame() {
 }
 
 brls::View* HRecyclerFrame::getDefaultFocus() {
-    if (this->dataSource && this->dataSource->getItemCount() > 0) return HScrollingFrame::getDefaultFocus();
-    return nullptr;
+    if (!this->dataSource || this->dataSource->getItemCount() == 0) return nullptr;
+
+    // Entering this row from outside (moving up/down between carousels, or
+    // focus being parked here): land on the cell visually nearest the view
+    // focus is coming from — the poster directly above/below it — instead of
+    // the row's first or last-remembered cell. A row with fewer posters
+    // naturally clamps to its closest edge cell. When focus is already inside
+    // this row (left/right movement, data refresh) keep the stock behaviour.
+    brls::View* current = brls::Application::getCurrentFocus();
+    bool focusInside = false;
+    for (brls::View* v = current; v != nullptr; v = v->getParent())
+        if (v == this) {
+            focusInside = true;
+            break;
+        }
+
+    if (current && !focusInside) {
+        float targetX = current->getFrame().getMidX();
+        brls::View* nearest = nullptr;
+        float nearestDist = 0;
+        for (auto* child : this->contentBox->getChildren()) {
+            brls::View* focus = child->getDefaultFocus();
+            if (!focus) continue;
+            float dist = std::fabs(focus->getFrame().getMidX() - targetX);
+            if (!nearest || dist < nearestDist) {
+                nearest = focus;
+                nearestDist = dist;
+            }
+        }
+        if (nearest) {
+            this->contentBox->setLastFocusedView(nearest);
+            return nearest;
+        }
+    }
+
+    return HScrollingFrame::getDefaultFocus();
 }
 
 void HRecyclerFrame::setDataSource(RecyclingGridDataSource* source) {
