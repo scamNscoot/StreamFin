@@ -16,6 +16,7 @@
 #include "view/h_recycling.hpp"
 #include "view/video_card.hpp"
 #include "view/svg_image.hpp"
+#include "view/stremio_theme.hpp"
 #include "utils/image.hpp"
 #include "utils/config.hpp"
 #include "api/stremio.hpp"
@@ -186,11 +187,16 @@ StremioHome::StremioHome() {
     brls::Logger::debug("StremioHome: create");
     this->setAxis(brls::Axis::COLUMN);
     this->setDimensions(brls::Application::contentWidth, brls::Application::contentHeight);
-    this->setBackgroundColor(nvgRGB(16, 18, 24));  // deep cinematic slate
+    // Background is the ocean gradient painted in draw().
 
     auto* scroll = new brls::ScrollingFrame();
     scroll->setGrow(1.0f);
     scroll->setScrollingIndicatorVisible(false);
+    // Centered scrolling: every Down/Up press hops one row (which is then
+    // scrolled into view) — natural scrolling instead pins focus to the
+    // current row until the next one is fully on screen, which made moving
+    // between rows below the fold need press-and-hold.
+    scroll->setScrollingBehavior(brls::ScrollingBehavior::CENTERED);
 
     this->boxHome = new brls::Box();
     this->boxHome->setAxis(brls::Axis::COLUMN);
@@ -240,6 +246,12 @@ StremioHome::StremioHome() {
     });
     if (stremio::STREAM_ADDON.empty())
         brls::sync([]() { promptForAddon(""); });
+}
+
+void StremioHome::draw(
+    NVGcontext* vg, float x, float y, float width, float height, brls::Style style, brls::FrameContext* ctx) {
+    stremio_theme::drawOceanBackground(vg, x, y, width, height);
+    brls::Box::draw(vg, x, y, width, height, style, ctx);
 }
 
 void StremioHome::addRow(const std::string& title, const std::string& url) {

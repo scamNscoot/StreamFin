@@ -18,6 +18,10 @@ public:
     explicit StremioDetail(const stremio::Meta& item);
     ~StremioDetail() override;
 
+    // Paints the shared ocean-gradient background behind the content.
+    void draw(NVGcontext* vg, float x, float y, float width, float height, brls::Style style,
+        brls::FrameContext* ctx) override;
+
 private:
     void applyMeta(const stremio::MetaDetail& meta);
     void onAction();      // Watch (movie) / Episodes (series)

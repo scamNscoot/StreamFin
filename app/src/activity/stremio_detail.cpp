@@ -10,6 +10,7 @@
 #include "activity/stremio_streams.hpp"
 #include "activity/stremio_favourites.hpp"
 #include "activity/stremio_resume.hpp"
+#include "view/stremio_theme.hpp"
 #include "utils/image.hpp"
 #include "api/stremio.hpp"
 
@@ -20,10 +21,9 @@ using namespace brls::literals;
 namespace {
 
 // Soft palette shared with the rest of the app.
-const NVGcolor COL_BG     = nvgRGB(16, 18, 24);    // cinematic slate
-const NVGcolor COL_TEXT   = nvgRGB(240, 242, 248); // soft white
-const NVGcolor COL_DIM    = nvgRGB(168, 176, 192); // secondary text
-const NVGcolor COL_ACCENT = nvgRGB(245, 33, 42);   // StreamFin brand red (meta line)
+const NVGcolor COL_TEXT   = stremio_theme::TEXT;      // soft white
+const NVGcolor COL_DIM    = stremio_theme::TEXT_DIM;  // secondary text
+const NVGcolor COL_ACCENT = stremio_theme::ACCENT_HI; // light Stremio purple (meta line)
 
 // Join a string list: {"A","B"} -> "A, B".
 std::string join(const std::vector<std::string>& v, const char* sep = ", ") {
@@ -42,7 +42,7 @@ StremioDetail::StremioDetail(const stremio::Meta& item) : item(item) {
     brls::Logger::debug("StremioDetail: {}", item.id);
     this->setAxis(brls::Axis::COLUMN);
     this->setDimensions(brls::Application::contentWidth, brls::Application::contentHeight);
-    this->setBackgroundColor(COL_BG);
+    // Background is the ocean gradient painted in draw().
     this->setPadding(40, 60, 40, 60);
 
     auto* row = new brls::Box();
@@ -103,7 +103,10 @@ StremioDetail::StremioDetail(const stremio::Meta& item) : item(item) {
     this->btnWatch->setAxis(brls::Axis::ROW);
     this->btnWatch->setPadding(14, 40, 14, 40);
     this->btnWatch->setCornerRadius(8);
-    this->btnWatch->setBackgroundColor(COL_ACCENT);  // brand red
+    this->btnWatch->setBackgroundColor(stremio_theme::ACCENT);  // Stremio purple
+    // Keep the purple visible while focused: the borealis highlight backdrop
+    // is painted over a view's own background and would cover it.
+    this->btnWatch->setHideHighlightBackground(true);
     auto* btnLabel = new brls::Label();
     // ▶ is in the Switch system font; ☰ is not (renders as a crossed box).
     btnLabel->setText(item.type == "series" ? "▶  Episodes" : "▶  Watch");
@@ -181,6 +184,12 @@ StremioDetail::StremioDetail(const stremio::Meta& item) : item(item) {
 // Release our reference on the shared poster texture (and abort any in-flight
 // request) — same contract as BaseCardCell.
 StremioDetail::~StremioDetail() { Image::cancel(this->poster); }
+
+void StremioDetail::draw(
+    NVGcontext* vg, float x, float y, float width, float height, brls::Style style, brls::FrameContext* ctx) {
+    stremio_theme::drawOceanBackground(vg, x, y, width, height);
+    brls::Box::draw(vg, x, y, width, height, style, ctx);
+}
 
 void StremioDetail::applyMeta(const stremio::MetaDetail& meta) {
     // Prefer the (English) meta name over the catalog one — for the title AND

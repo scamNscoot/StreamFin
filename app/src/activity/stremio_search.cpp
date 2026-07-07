@@ -10,6 +10,7 @@
 #include "view/recycling_grid.hpp"
 #include "view/video_card.hpp"
 #include "view/svg_image.hpp"
+#include "view/stremio_theme.hpp"
 #include "utils/image.hpp"
 #include "api/stremio.hpp"
 
@@ -99,7 +100,7 @@ StremioSearch::StremioSearch(const std::string& query) {
     brls::Logger::debug("StremioSearch: {}", query);
     this->setAxis(brls::Axis::COLUMN);
     this->setDimensions(brls::Application::contentWidth, brls::Application::contentHeight);
-    this->setBackgroundColor(brls::Application::getTheme()["brls/background"]);
+    // Background is the ocean gradient painted in draw().
     this->setPadding(20, 40, 20, 40);
 
     // Plain label, styled like the home-row titles. (brls::Header draws a
@@ -132,6 +133,12 @@ StremioSearch::StremioSearch(const std::string& query) {
     std::string q = urlEncode(query);
     this->fetchInto(stremio::CINEMETA + "/catalog/movie/top/search=" + q + ".json", false);
     this->fetchInto(stremio::CINEMETA + "/catalog/series/top/search=" + q + ".json", true);
+}
+
+void StremioSearch::draw(
+    NVGcontext* vg, float x, float y, float width, float height, brls::Style style, brls::FrameContext* ctx) {
+    stremio_theme::drawOceanBackground(vg, x, y, width, height);
+    brls::Box::draw(vg, x, y, width, height, style, ctx);
 }
 
 void StremioSearch::fetchInto(const std::string& url, bool isSeries) {

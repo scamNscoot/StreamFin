@@ -16,6 +16,10 @@ class StremioSearch : public brls::Box {
 public:
     explicit StremioSearch(const std::string& query);
 
+    // Paints the shared ocean-gradient background behind the results grid.
+    void draw(NVGcontext* vg, float x, float y, float width, float height, brls::Style style,
+        brls::FrameContext* ctx) override;
+
     // Stores one batch of results (movies or series) and rebuilds the grid.
     void addResults(const std::vector<stremio::Meta>& metas, bool isSeries);
 
