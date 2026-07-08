@@ -27,6 +27,9 @@ private:
     void addContinueRow();
     void refreshContinue();
     void popToHome();  // close everything above home after playback stops
+    // Move focus onto a row that can actually take it (not `avoid`); a row
+    // still showing skeletons refuses focus, so try several. Returns success.
+    bool parkFocus(brls::View* avoid);
     void enrichContinue();  // fetch English titles from Cinemeta, then rebuild once
 
     brls::Box* boxHome = nullptr;          // column container inside the scroll

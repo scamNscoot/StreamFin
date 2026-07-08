@@ -41,9 +41,9 @@ jobs:
     - name: Release
       uses: softprops/action-gh-release@v2
       with:
-        name: StreamFinEX v0.3.1
-        tag_name: v0.3.1
+        name: StreamFinEX v0.3.2
+        tag_name: v0.3.2
         files: build/StreamFin.nro
         body: |
-          Library grid with search+sort, smoother cell-aligned carousels, continue-watching fixes, more catalog rows.
+          Ghost-outline fix on continue-watching removal, Library card art, slower focus pulse, 12 more rows.
           Copy `StreamFin.nro` to `/switch/` on your SD card.

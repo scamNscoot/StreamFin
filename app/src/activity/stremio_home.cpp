@@ -137,6 +137,7 @@ public:
             cell->labelExt->setVisibility(brls::Visibility::VISIBLE);
             cell->badgeFavorite->setVisibility(brls::Visibility::INVISIBLE);
             cell->onToggleFav = nullptr;
+            cell->picture->setImageFromRes("img/library-card.png");
             return cell;
         }
 
@@ -297,6 +298,18 @@ StremioHome::StremioHome() {
     this->addRow("Horror Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Horror.json");
     this->addRow("Thriller Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Thriller.json");
     this->addRow("Fantasy Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Fantasy.json");
+    this->addRow("Action Series", stremio::CINEMETA + "/catalog/series/top/genre=Action.json");
+    this->addRow("Adventure Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Adventure.json");
+    this->addRow("Crime Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Crime.json");
+    this->addRow("Crime Series", stremio::CINEMETA + "/catalog/series/top/genre=Crime.json");
+    this->addRow("Mystery Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Mystery.json");
+    this->addRow("Mystery Series", stremio::CINEMETA + "/catalog/series/top/genre=Mystery.json");
+    this->addRow("Romance Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Romance.json");
+    this->addRow("Sci-Fi Series", stremio::CINEMETA + "/catalog/series/top/genre=Sci-Fi.json");
+    this->addRow("Fantasy Series", stremio::CINEMETA + "/catalog/series/top/genre=Fantasy.json");
+    this->addRow("Family Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Family.json");
+    this->addRow("War Movies", stremio::CINEMETA + "/catalog/movie/top/genre=War.json");
+    this->addRow("Western Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Western.json");
     this->addRow("Documentary Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Documentary.json");
     this->addRow("Documentary Series", stremio::CINEMETA + "/catalog/series/top/genre=Documentary.json");
 
@@ -325,6 +338,18 @@ void StremioHome::draw(
     NVGcontext* vg, float x, float y, float width, float height, brls::Style style, brls::FrameContext* ctx) {
     stremio_theme::drawOceanBackground(vg, x, y, width, height);
     brls::Box::draw(vg, x, y, width, height, style, ctx);
+}
+
+bool StremioHome::parkFocus(brls::View* avoid) {
+    HRecyclerFrame* candidates[] = {this->favRec, this->firstRowRec, this->continueRec};
+    for (auto* row : candidates) {
+        if (!row || row == avoid || row->getVisibility() != brls::Visibility::VISIBLE) continue;
+        brls::View* target = row->getDefaultFocus();
+        if (!target) continue;  // e.g. still showing skeletons
+        brls::Application::giveFocus(target);
+        return true;
+    }
+    return false;
 }
 
 // Pop one activity per frame until home is on top, then focus Continue Watching.
@@ -388,7 +413,7 @@ void StremioHome::refreshFavourites() {
             focusHere = true;
             break;
         }
-    if (focusHere && this->firstRowRec) brls::Application::giveFocus(this->firstRowRec);
+    if (focusHere) this->parkFocus(this->favRec);
 
     // The Library row is ALWAYS visible: up to 4 newest saved titles plus the
     // "See all" card (which is the whole row when the library is empty). Not
@@ -428,15 +453,20 @@ void StremioHome::refreshContinue() {
             break;
         }
 
-    // Park focus on a stable row BEFORE we tear down the old cells, so the focus
-    // highlight is never left pointing at a cell that's about to be destroyed.
-    if (focusHere && this->firstRowRec) brls::Application::giveFocus(this->firstRowRec);
+    // Park focus on a row that can actually take it BEFORE we tear down the
+    // old cells. If parking failed (everything else still loading), fall back
+    // to the home box so focus can never stay on a cell about to be destroyed
+    // (that left a floating outline through which the removed item was still
+    // openable).
+    if (focusHere && !this->parkFocus(this->continueRec)) brls::Application::giveFocus(this);
 
     auto cw = ResumeTracker::instance().continueWatching();
     if (cw.empty()) {
         this->continueHeader->setVisibility(brls::Visibility::GONE);
         this->continueRec->setVisibility(brls::Visibility::GONE);
-        // Row is gone now; leave focus on the parked row.
+        // Purge the old cells and data source too: a hidden row keeping them
+        // alive is what made the removed poster still selectable.
+        this->continueRec->setDataSource(new ContinueSource(std::vector<ResumeEntry>{}));
     } else {
         this->continueHeader->setVisibility(brls::Visibility::VISIBLE);
         this->continueRec->setVisibility(brls::Visibility::VISIBLE);
@@ -482,7 +512,7 @@ void StremioHome::enrichContinue() {
                 focusHere = true;
                 break;
             }
-        if (focusHere && this->firstRowRec) brls::Application::giveFocus(this->firstRowRec);
+        if (focusHere) this->parkFocus(this->continueRec);
         this->continueRec->setDataSource(new ContinueSource(fresh));
         if (focusHere) brls::sync([this]() { brls::Application::giveFocus(this->continueRec); });
     };

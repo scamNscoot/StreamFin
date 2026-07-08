@@ -172,6 +172,9 @@ void HRecyclerFrame::reloadData() {
     setContentOffsetX(0, false);
 
     if (this->dataSource) {
+        // Every cell was just queued for reuse; forget the remembered focus so
+        // an empty row can never hand back a recycled cell (ghost outline).
+        if (dataSource->getItemCount() == 0) contentBox->setLastFocusedView(nullptr);
         contentBox->setWidth(
             (estimatedRowWidth + estimatedRowSpace) * dataSource->getItemCount() + paddingLeft + paddingRight);
         // 填充足够多的cell到屏幕上
