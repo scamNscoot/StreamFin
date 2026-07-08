@@ -178,6 +178,16 @@ void StremioSearch::rebuild() {
         return;
     }
     bool firstResults = dynamic_cast<SearchSource*>(this->recycler->getDataSource()) == nullptr;
+    // If focus is already inside the grid, the rebuild recycles the focused
+    // cell — the outline would silently follow the reused object onto a
+    // random poster. Re-give focus so it lands back on the first result.
+    bool focusInside = false;
+    for (brls::View* f = brls::Application::getCurrentFocus(); f != nullptr; f = f->getParent())
+        if (f == this->recycler) {
+            focusInside = true;
+            break;
+        }
     this->recycler->setDataSource(new SearchSource(mixed));
-    if (firstResults) brls::Application::giveFocus(this->recycler);
+    if (firstResults || focusInside)
+        brls::sync([this]() { brls::Application::giveFocus(this->recycler); });
 }

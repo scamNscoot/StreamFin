@@ -105,8 +105,11 @@ StremioDetail::StremioDetail(const stremio::Meta& item) : item(item) {
     this->btnWatch->setCornerRadius(8);
     this->btnWatch->setBackgroundColor(stremio_theme::ACCENT);  // Stremio purple
     // Keep the purple visible while focused: the borealis highlight backdrop
-    // is painted over a view's own background and would cover it.
+    // is painted over a view's own background and would cover it. Match the
+    // focus outline to the pill's rounded shape.
     this->btnWatch->setHideHighlightBackground(true);
+    this->btnWatch->setHighlightCornerRadius(11);
+    this->btnWatch->setHighlightPadding(3);
     auto* btnLabel = new brls::Label();
     // ▶ is in the Switch system font; ☰ is not (renders as a crossed box).
     btnLabel->setText(item.type == "series" ? "▶  Episodes" : "▶  Watch");

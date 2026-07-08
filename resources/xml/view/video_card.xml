@@ -25,7 +25,7 @@
 
         <SVGImage
             id="video/card/badge/favorite"
-            svg="@res/icon/ico-heart-outline.svg"
+            svg="@res/icon/ico-library-badge.svg"
             visibility="invisible"
             positionType="absolute"
             positionBottom="36"

@@ -54,7 +54,7 @@ void styleRowHeader(brls::Label* h, const std::string& text) {
     h->setFontSize(27);
     h->setMarginTop(28);
     h->setMarginBottom(12);
-    h->setMarginLeft(6);
+    h->setMarginLeft(56);  // rows are edge-to-edge; keep titles at the old inset
     h->setTextColor(nvgRGB(240, 242, 248));  // soft white for clear hierarchy
 }
 
@@ -258,7 +258,11 @@ StremioHome::StremioHome() {
 
     this->boxHome = new brls::Box();
     this->boxHome->setAxis(brls::Axis::COLUMN);
-    this->boxHome->setPadding(16, 50, 32, 50);  // more breathing room at the edges
+    // No side padding: each row runs edge-to-edge and carries its own 50px
+    // inner padding instead, so a scrolled row shows a sliver of the previous
+    // poster on the left (like the next-poster sliver on the right) instead
+    // of clipping to nothing at the old padding boundary.
+    this->boxHome->setPadding(16, 0, 32, 0);
     scroll->setContentView(this->boxHome);
 
     this->addView(scroll);
@@ -288,27 +292,37 @@ StremioHome::StremioHome() {
     this->addRow("New Series", stremio::CINEMETA + "/catalog/series/year/genre=" + year + ".json");
     this->addRow("Top Rated Movies", stremio::CINEMETA + "/catalog/movie/imdbRating.json");
     this->addRow("Top Rated Series", stremio::CINEMETA + "/catalog/series/imdbRating.json");
+    // Surprise Me: a random genre catalog each launch.
+    {
+        static const char* genres[] = {"Action", "Adventure", "Animation", "Comedy", "Crime", "Drama", "Family",
+            "Fantasy", "History", "Horror", "Mystery", "Romance", "Sci-Fi", "Thriller", "War", "Western"};
+        std::srand((unsigned)now);
+        bool series = std::rand() & 1;
+        std::string genre = genres[std::rand() % 16];
+        this->addRow("Surprise Me", stremio::CINEMETA + std::string("/catalog/") + (series ? "series" : "movie") +
+                                        "/top/genre=" + genre + ".json");
+    }
     this->addRow("Animation Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Animation.json");
     this->addRow("Animation Series", stremio::CINEMETA + "/catalog/series/top/genre=Animation.json");
     this->addRow("Action Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Action.json");
+    this->addRow("Action Series", stremio::CINEMETA + "/catalog/series/top/genre=Action.json");
+    this->addRow("Sci-Fi Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Sci-Fi.json");
+    this->addRow("Sci-Fi Series", stremio::CINEMETA + "/catalog/series/top/genre=Sci-Fi.json");
+    this->addRow("Thriller Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Thriller.json");
+    this->addRow("Horror Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Horror.json");
+    // Anime via the public Kitsu addon (Cinemeta has no separate anime genre).
+    this->addRow("Anime Series", "https://anime-kitsu.strem.fun/catalog/series/kitsu-anime-trending.json");
     this->addRow("Comedy Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Comedy.json");
     this->addRow("Comedy Series", stremio::CINEMETA + "/catalog/series/top/genre=Comedy.json");
-    this->addRow("Sci-Fi Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Sci-Fi.json");
+    this->addRow("War Movies", stremio::CINEMETA + "/catalog/movie/top/genre=War.json");
     this->addRow("Drama Series", stremio::CINEMETA + "/catalog/series/top/genre=Drama.json");
-    this->addRow("Horror Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Horror.json");
-    this->addRow("Thriller Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Thriller.json");
     this->addRow("Fantasy Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Fantasy.json");
-    this->addRow("Action Series", stremio::CINEMETA + "/catalog/series/top/genre=Action.json");
-    this->addRow("Adventure Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Adventure.json");
+    this->addRow("Fantasy Series", stremio::CINEMETA + "/catalog/series/top/genre=Fantasy.json");
     this->addRow("Crime Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Crime.json");
     this->addRow("Crime Series", stremio::CINEMETA + "/catalog/series/top/genre=Crime.json");
     this->addRow("Mystery Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Mystery.json");
     this->addRow("Mystery Series", stremio::CINEMETA + "/catalog/series/top/genre=Mystery.json");
     this->addRow("Romance Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Romance.json");
-    this->addRow("Sci-Fi Series", stremio::CINEMETA + "/catalog/series/top/genre=Sci-Fi.json");
-    this->addRow("Fantasy Series", stremio::CINEMETA + "/catalog/series/top/genre=Fantasy.json");
-    this->addRow("Family Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Family.json");
-    this->addRow("War Movies", stremio::CINEMETA + "/catalog/movie/top/genre=War.json");
     this->addRow("Western Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Western.json");
     this->addRow("Documentary Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Documentary.json");
     this->addRow("Documentary Series", stremio::CINEMETA + "/catalog/series/top/genre=Documentary.json");
@@ -369,6 +383,7 @@ void StremioHome::addRow(const std::string& title, const std::string& url) {
     auto* rec = new HRecyclerFrame();
     rec->setHeight(300);
     rec->estimatedRowWidth = 175;
+    rec->setPadding(0, 50, 0, 50);
     rec->registerCell("Cell", FavCardCell::create);
     this->boxHome->addView(rec);
     if (!this->firstRowRec) this->firstRowRec = rec;  // safe parking spot for focus
@@ -392,6 +407,7 @@ void StremioHome::addFavouritesRow() {
     this->favRec = new HRecyclerFrame();
     this->favRec->setHeight(300);
     this->favRec->estimatedRowWidth = 175;
+    this->favRec->setPadding(0, 50, 0, 50);
     this->favRec->registerCell("Cell", FavCardCell::create);
     this->boxHome->addView(this->favRec);
 
@@ -436,6 +452,7 @@ void StremioHome::addContinueRow() {
     this->continueRec = new HRecyclerFrame();
     this->continueRec->setHeight(300);
     this->continueRec->estimatedRowWidth = 175;
+    this->continueRec->setPadding(0, 50, 0, 50);
     this->continueRec->registerCell("Cell", FavCardCell::create);
     this->boxHome->addView(this->continueRec);
 

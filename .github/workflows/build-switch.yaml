@@ -41,9 +41,9 @@ jobs:
     - name: Release
       uses: softprops/action-gh-release@v2
       with:
-        name: StreamFinEX v0.3.2
-        tag_name: v0.3.2
+        name: StreamFinEX v0.3.3
+        tag_name: v0.3.3
         files: build/StreamFin.nro
         body: |
-          Ghost-outline fix on continue-watching removal, Library card art, slower focus pulse, 12 more rows.
+          Kirbosh author, circular library badge, left poster sliver, search focus fix, Surprise Me + Anime rows.
           Copy `StreamFin.nro` to `/switch/` on your SD card.
