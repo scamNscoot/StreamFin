@@ -169,6 +169,10 @@ StreamPicker::StreamPicker(
     this->setDimensions(brls::Application::contentWidth, brls::Application::contentHeight);
     this->setBackgroundColor(brls::Application::getTheme()["brls/background"]);
     this->setPadding(20, 40, 20, 40);
+    // Hold focus here (hidden highlight) while the list loads / when empty,
+    // so the outline can't float over the covered detail screen.
+    this->setFocusable(true);
+    this->setHideHighlight(true);
 
     this->recycler = new RecyclingGrid();
     this->recycler->setGrow(1.0f);
@@ -194,6 +198,7 @@ StreamPicker::StreamPicker(
         this->recycler->setDataSource(new StreamSource(resumeKey, playable));
     }
     // Defer focus until after the activity is on screen.
+    brls::sync([this]() { brls::Application::giveFocus(this); });
     brls::sync([this]() { brls::Application::giveFocus(this->recycler); });
 
     this->registerAction("hints/back"_i18n, brls::BUTTON_B, [](brls::View*) {

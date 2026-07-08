@@ -110,12 +110,12 @@ StremioDetail::StremioDetail(const stremio::Meta& item) : item(item) {
     this->btnWatch->setHideHighlightBackground(true);
     this->btnWatch->setHighlightCornerRadius(11);
     this->btnWatch->setHighlightPadding(3);
-    auto* btnLabel = new brls::Label();
+    this->btnLabel = new brls::Label();
     // ▶ is in the Switch system font; ☰ is not (renders as a crossed box).
-    btnLabel->setText(item.type == "series" ? "▶  Episodes" : "▶  Watch");
-    btnLabel->setFontSize(24);
-    btnLabel->setTextColor(COL_TEXT);
-    this->btnWatch->addView(btnLabel);
+    this->btnLabel->setText(item.type == "series" ? "▶  Episodes" : "▶  Watch");
+    this->btnLabel->setFontSize(24);
+    this->btnLabel->setTextColor(COL_TEXT);
+    this->btnWatch->addView(this->btnLabel);
     this->btnWatch->registerClickAction([this](brls::View*) {
         this->onAction();
         return true;
@@ -170,7 +170,8 @@ StremioDetail::StremioDetail(const stremio::Meta& item) : item(item) {
     // Something must hold focus so A/B work immediately.
     brls::sync([this]() { brls::Application::giveFocus(this->btnWatch); });
 
-    // ---- Fetch full metadata from Cinemeta ---------------------------------
+    // ---- Fetch full metadata (Cinemeta; Kitsu addon for kitsu: ids) --------
+    const std::string& metaBase = item.id.rfind("kitsu:", 0) == 0 ? stremio::KITSU : stremio::CINEMETA;
     ASYNC_RETAIN
     stremio::getJSON<stremio::MetaResult>(
         [ASYNC_TOKEN](stremio::MetaResult r) {
@@ -181,7 +182,7 @@ StremioDetail::StremioDetail(const stremio::Meta& item) : item(item) {
             ASYNC_RELEASE
             this->labelDesc->setText("No details available.");
         },
-        stremio::CINEMETA + "/meta/" + item.type + "/" + item.id + ".json");
+        metaBase + "/meta/" + item.type + "/" + item.id + ".json");
 }
 
 // Release our reference on the shared poster texture (and abort any in-flight
@@ -206,6 +207,7 @@ void StremioDetail::applyMeta(const stremio::MetaDetail& meta) {
     // without refetching the meta, and the backdrop as episode-thumb fallback.
     this->videos = meta.videos;
     this->background = meta.background;
+    if (!this->videos.empty() && this->item.type != "movie") this->btnLabel->setText("▶  Episodes");
 
     // Year · runtime · ★ rating (· N seasons for series)
     std::vector<std::string> parts;
@@ -242,7 +244,8 @@ void StremioDetail::applyMeta(const stremio::MetaDetail& meta) {
 }
 
 void StremioDetail::onAction() {
-    if (this->item.type == "series") {
+    // Series — and anime whose Kitsu meta lists episodes — open the list.
+    if (this->item.type == "series" || !this->videos.empty()) {
         // Reuse the episodes we already fetched; fall back to the fetching
         // constructor if the meta hasn't arrived (or failed).
         if (!this->videos.empty())

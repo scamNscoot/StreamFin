@@ -102,6 +102,10 @@ StremioSearch::StremioSearch(const std::string& query) {
     this->setDimensions(brls::Application::contentWidth, brls::Application::contentHeight);
     // Background is the ocean gradient painted in draw().
     this->setPadding(20, 40, 20, 40);
+    // Hold focus here (hidden highlight) until results arrive, so the outline
+    // can't float over the covered home screen.
+    this->setFocusable(true);
+    this->setHideHighlight(true);
 
     // Plain label, styled like the home-row titles. (brls::Header draws a
     // full-width underline that looked like a stray line above the posters.)
@@ -128,7 +132,7 @@ StremioSearch::StremioSearch(const std::string& query) {
     });
 
     // Make sure something is focused so B (back) always works.
-    brls::sync([this]() { brls::Application::giveFocus(this->recycler); });
+    brls::sync([this]() { brls::Application::giveFocus(this); });
 
     std::string q = urlEncode(query);
     this->fetchInto(stremio::CINEMETA + "/catalog/movie/top/search=" + q + ".json", false);

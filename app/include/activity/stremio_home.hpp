@@ -22,7 +22,7 @@ public:
 
 private:
     void addRow(const std::string& title, const std::string& url);
-    void addSurpriseRow();  // shuffled blend of random catalogs
+    void addAnimeRow();  // Kitsu trending + More card (anime browse/search)
     void addTopBar();       // stremio logo + search button (scrolls with content)
     void addFavouritesRow();
     void refreshFavourites();

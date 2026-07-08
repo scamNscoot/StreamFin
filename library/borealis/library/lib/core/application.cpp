@@ -786,7 +786,14 @@ void Application::frame()
     }
 
     if (currentFocus && Application::getInputType() != InputType::TOUCH)
-        currentFocus->frameHighlight(&frameContext);
+    {
+        // Only draw the highlight when the focused view belongs to the topmost
+        // activity. A recycled cell or a view covered by a pushed screen would
+        // otherwise leave the outline floating at stale coordinates.
+        Activity* top = Application::activitiesStack.empty() ? nullptr : Application::activitiesStack.back();
+        if (top && currentFocus->getParentActivity() == top)
+            currentFocus->frameHighlight(&frameContext);
+    }
 
     // Notifications
     Application::notificationManager->frame(&frameContext);

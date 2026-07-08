@@ -44,9 +44,9 @@ jobs:
     - name: Release
       uses: softprops/action-gh-release@v2
       with:
-        name: StreamFinEX v0.3.5
-        tag_name: v0.3.5
+        name: StreamFinEX v0.3.6
+        tag_name: v0.3.6
         files: build/StreamFin.nro
         body: |
-          Square library tiles; library badge is now a single dot in the bottom-left corner.
+          No more floating outlines while loading; working Anime row with browse+search screen; Library card at slot 6; Surprise Me removed.
           Copy `StreamFin.nro` to `/switch/` on your SD card.

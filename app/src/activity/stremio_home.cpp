@@ -13,6 +13,7 @@
 #include "activity/stremio_favourites.hpp"
 #include "activity/stremio_resume.hpp"
 #include "activity/stremio_library.hpp"
+#include "activity/stremio_anime.hpp"
 #include "view/mpv_core.hpp"
 #include "view/recycling_grid.hpp"
 #include "view/h_recycling.hpp"
@@ -25,7 +26,6 @@
 
 #include <ctime>
 #include <memory>
-#include <random>
 
 using namespace brls::literals;
 
@@ -184,6 +184,64 @@ private:
     std::vector<stremio::Meta> list;
 };
 
+// Home "Anime" row: a few trending anime (Kitsu addon) plus a final "More"
+// card that opens the anime browse/search screen.
+class AnimeRowSource : public RecyclingGridDataSource {
+public:
+    explicit AnimeRowSource(std::vector<stremio::Meta> r) : list(std::move(r)) {}
+
+    size_t getItemCount() override { return this->list.size() + 1; }  // + More card
+
+    RecyclingGridItem* cellForRow(RecyclingView* recycler, size_t index) override {
+        FavCardCell* cell = dynamic_cast<FavCardCell*>(recycler->dequeueReusableCell("Cell"));
+        cell->badgeTopRight->setVisibility(brls::Visibility::GONE);
+        cell->rectProgress->getParent()->setVisibility(brls::Visibility::GONE);
+        cell->labelRating->setVisibility(brls::Visibility::INVISIBLE);
+
+        if (index == this->list.size()) {  // the More card
+            cell->labelTitle->setText("Anime");
+            cell->labelExt->setText("Browse & search");
+            cell->labelExt->setVisibility(brls::Visibility::VISIBLE);
+            cell->badgeFavorite->setVisibility(brls::Visibility::INVISIBLE);
+            cell->onToggleFav = nullptr;
+            cell->picture->setImageFromRes("img/library-card.png");
+            return cell;
+        }
+
+        auto item = this->list.at(index);
+        cell->labelTitle->setText(item.name);
+        if (item.year.empty()) {
+            cell->labelExt->setVisibility(brls::Visibility::GONE);
+        } else {
+            cell->labelExt->setText(item.year);
+            cell->labelExt->setVisibility(brls::Visibility::VISIBLE);
+        }
+        bool fav = Favourites::instance().contains(item.id);
+        cell->badgeFavorite->setVisibility(fav ? brls::Visibility::VISIBLE : brls::Visibility::INVISIBLE);
+        cell->onToggleFav = [item, cell]() {
+            bool nowFav = Favourites::instance().toggle(item);
+            cell->badgeFavorite->setVisibility(nowFav ? brls::Visibility::VISIBLE : brls::Visibility::INVISIBLE);
+        };
+        if (!item.poster.empty()) Image::with(cell->picture, item.poster);
+        return cell;
+    }
+
+    void onItemSelected(brls::Box* recycler, size_t index) override {
+        if (index == this->list.size()) {
+            brls::Application::pushActivity(
+                new brls::Activity(new StremioAnime()), brls::TransitionAnimation::NONE);
+            return;
+        }
+        brls::Application::pushActivity(
+            new brls::Activity(new StremioDetail(this->list.at(index))), brls::TransitionAnimation::NONE);
+    }
+
+    void clearData() override { this->list.clear(); }
+
+private:
+    std::vector<stremio::Meta> list;
+};
+
 // Continue Watching: poster cards with a progress bar; selecting one fetches
 // streams and resumes where you left off.
 class ContinueSource : public RecyclingGridDataSource {
@@ -305,7 +363,6 @@ StremioHome::StremioHome() {
     this->addRow("New Series", stremio::CINEMETA + "/catalog/series/year/genre=" + year + ".json");
     this->addRow("Top Rated Movies", stremio::CINEMETA + "/catalog/movie/imdbRating.json");
     this->addRow("Top Rated Series", stremio::CINEMETA + "/catalog/series/imdbRating.json");
-    this->addSurpriseRow();
     this->addRow("Animation Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Animation.json");
     this->addRow("Animation Series", stremio::CINEMETA + "/catalog/series/top/genre=Animation.json");
     this->addRow("Action Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Action.json");
@@ -314,8 +371,7 @@ StremioHome::StremioHome() {
     this->addRow("Sci-Fi Series", stremio::CINEMETA + "/catalog/series/top/genre=Sci-Fi.json");
     this->addRow("Thriller Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Thriller.json");
     this->addRow("Horror Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Horror.json");
-    // Anime via the public Kitsu addon (Cinemeta has no separate anime genre).
-    this->addRow("Anime Series", "https://anime-kitsu.strem.fun/catalog/series/kitsu-anime-trending.json");
+    this->addAnimeRow();  // trending anime (Kitsu addon) + More card
     this->addRow("Comedy Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Comedy.json");
     this->addRow("Comedy Series", stremio::CINEMETA + "/catalog/series/top/genre=Comedy.json");
     this->addRow("War Movies", stremio::CINEMETA + "/catalog/movie/top/genre=War.json");
@@ -415,11 +471,11 @@ void StremioHome::addTopBar() {
     this->boxHome->addView(bar);
 }
 
-// Surprise Me: a shuffled blend of several random genre catalogs — genuinely
-// random picks each launch, not just one randomly chosen category.
-void StremioHome::addSurpriseRow() {
+// Anime row: 5 trending titles from Kitsu + the More card. The card is shown
+// even if the fetch fails, so the anime screen stays reachable.
+void StremioHome::addAnimeRow() {
     auto* header = new brls::Label();
-    styleRowHeader(header, "Surprise Me");
+    styleRowHeader(header, "Anime");
     this->boxHome->addView(header);
 
     auto* rec = new HRecyclerFrame();
@@ -428,49 +484,20 @@ void StremioHome::addSurpriseRow() {
     rec->setPadding(0, 50, 0, 50);
     rec->registerCell("Cell", FavCardCell::create);
     this->boxHome->addView(rec);
-    rec->showSkeleton(8);
+    rec->showSkeleton(6);
 
-    static const char* genres[] = {"Action", "Adventure", "Animation", "Comedy", "Crime", "Drama", "Family",
-        "Fantasy", "History", "Horror", "Mystery", "Romance", "Sci-Fi", "Thriller", "War", "Western"};
-    unsigned seed = (unsigned)std::time(nullptr);
-    std::mt19937 rng(seed);
-
-    // Pull 4 random catalogs, merge (deduped), shuffle, keep 20.
-    auto pool = std::make_shared<std::vector<stremio::Meta>>();
-    auto pending = std::make_shared<int>(4);
-    auto finish = [rec, pool, pending, seed]() {
-        if (--(*pending) > 0) return;
-        if (pool->empty()) return;
-        std::shuffle(pool->begin(), pool->end(), std::mt19937(seed));
-        if (pool->size() > 20) pool->resize(20);
-        rec->setDataSource(new StremioSource(*pool));
-    };
-
-    for (int i = 0; i < 4; i++) {
-        std::string type = (rng() & 1) ? "series" : "movie";
-        std::string genre = genres[rng() % 16];
-        std::string url = stremio::CINEMETA + "/catalog/" + type + "/top/genre=" + genre + ".json";
-        ASYNC_RETAIN
-        stremio::getJSON<stremio::MetaList>(
-            [ASYNC_TOKEN, pool, finish](stremio::MetaList r) {
-                ASYNC_RELEASE
-                for (auto& m : r.metas) {
-                    bool dup = false;
-                    for (auto& p : *pool)
-                        if (p.id == m.id) {
-                            dup = true;
-                            break;
-                        }
-                    if (!dup) pool->push_back(m);
-                }
-                finish();
-            },
-            [ASYNC_TOKEN, finish](const std::string&) {
-                ASYNC_RELEASE
-                finish();
-            },
-            url);
-    }
+    ASYNC_RETAIN
+    stremio::getJSON<stremio::MetaList>(
+        [ASYNC_TOKEN, rec](stremio::MetaList r) {
+            ASYNC_RELEASE
+            if (r.metas.size() > 5) r.metas.resize(5);
+            rec->setDataSource(new AnimeRowSource(r.metas));
+        },
+        [ASYNC_TOKEN, rec](const std::string&) {
+            ASYNC_RELEASE
+            rec->setDataSource(new AnimeRowSource({}));  // just the More card
+        },
+        stremio::KITSU + "/catalog/anime/kitsu-anime-trending.json");
 }
 
 void StremioHome::addRow(const std::string& title, const std::string& url) {
@@ -535,7 +562,7 @@ void StremioHome::refreshFavourites() {
     // the appear/disappear cycle used to cause.
     auto& favs = Favourites::instance().all();
     std::vector<stremio::Meta> newest(favs.rbegin(), favs.rend());
-    if (newest.size() > 4) newest.resize(4);
+    if (newest.size() > 5) newest.resize(5);
     this->favRec->setDataSource(new LibraryRowSource(std::move(newest)));
     if (focusHere) brls::sync([this]() { brls::Application::giveFocus(this->favRec); });
     // Force a clean relayout (see refreshContinue for why).

@@ -41,4 +41,5 @@ private:
     brls::Label* labelCast = nullptr;
     brls::Label* labelDirector = nullptr;
     brls::Box* btnWatch = nullptr;
+    brls::Label* btnLabel = nullptr;
 };

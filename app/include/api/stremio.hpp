@@ -57,6 +57,11 @@ inline std::vector<std::string> jstrlist(const nlohmann::json& j, const char* ke
 // Cinemeta: public catalog + metadata addon (browse / search / details).
 inline const std::string CINEMETA = "https://v3-cinemeta.strem.io";
 
+// Anime Kitsu: public anime catalog/meta addon. Its catalogs use type "anime"
+// (ids like "kitsu:1376"); trending + search catalogs are used by the Anime
+// row and the Anime browse screen.
+inline const std::string KITSU = "https://anime-kitsu.strem.fun";
+
 // The user's stream addon (AIOStreams, Torrentio, or anything implementing the
 // Stremio "stream" resource). The base is everything BEFORE "/manifest.json".
 // Stream requests look like:
