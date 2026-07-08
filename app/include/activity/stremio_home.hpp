@@ -36,6 +36,7 @@ private:
     bool parkFocus(brls::View* avoid);
     void enrichContinue();  // fetch English titles from Cinemeta, then rebuild once
 
+    brls::ScrollingFrame* homeScroll = nullptr;  // vertical scroll (reset on rebuild)
     brls::Box* boxHome = nullptr;          // column container inside the scroll
     brls::Label* favHeader = nullptr;       // "Favourites" row title (hidden when empty)
     HRecyclerFrame* favRec = nullptr;       // favourites carousel

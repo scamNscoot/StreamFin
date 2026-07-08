@@ -130,16 +130,16 @@ public:
         this->setFocusable(true);
         this->setAxis(brls::Axis::ROW);
         this->setAlignItems(brls::AlignItems::CENTER);
-        this->setPadding(10, 20, 10, 20);
+        this->setPadding(8, 14, 8, 14);
         this->setCornerRadius(6);
 
         this->name = new brls::Label();
-        this->name->setFontSize(24);
+        this->name->setFontSize(20);
         this->name->setGrow(1.0f);
         this->addView(this->name);
 
         this->state = new brls::Label();
-        this->state->setFontSize(22);
+        this->state->setFontSize(18);
         this->addView(this->state);
 
         this->registerAction("Move up", brls::BUTTON_Y, [this](brls::View*) {
@@ -200,20 +200,19 @@ StremioRows::StremioRows(std::function<void()> onApply) : onApply(onApply) {
     this->setFocusable(true);
     this->setHideHighlight(true);
 
-    auto* head = new brls::Label();
-    head->setText("Home rows — A toggle · Y move up · X move down · B save");
-    head->setFontSize(26);
-    head->setTextColor(stremio_theme::TEXT);
-    head->setMarginBottom(14);
-    this->addView(head);
+    this->head = new brls::Label();
+    this->head->setFontSize(26);
+    this->head->setTextColor(stremio_theme::TEXT);
+    this->head->setMarginBottom(14);
+    this->addView(this->head);
 
     this->rows = rowcfg::load();
 
     this->recycler = new RecyclingGrid();
     this->recycler->setGrow(1.0f);
     this->recycler->setScrollingIndicatorVisible(false);
-    this->recycler->spanCount = 1;
-    this->recycler->estimatedRowHeight = 56;
+    this->recycler->spanCount = 3;
+    this->recycler->estimatedRowHeight = 64;
     this->recycler->estimatedRowSpace = 8;
     this->recycler->registerCell("Cell", RowCell::create);
     this->addView(this->recycler);
@@ -233,6 +232,11 @@ StremioRows::StremioRows(std::function<void()> onApply) : onApply(onApply) {
 }
 
 void StremioRows::reload(size_t focusIndex) {
+    size_t on = 0;
+    for (auto& r : this->rows)
+        if (r.second) on++;
+    this->head->setText(fmt::format(
+        "Home rows · {} of {} enabled — A toggle · Y up · X down · B save", on, this->rows.size()));
     auto move = [this](size_t i, int dir) {
         size_t j = (size_t)((int)i + dir);
         if (j >= this->rows.size()) return;

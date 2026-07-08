@@ -45,6 +45,7 @@ public:
 private:
     void reload(size_t focusIndex);
 
+    brls::Label* head = nullptr;
     std::vector<std::pair<std::string, bool>> rows;
     bool dirty = false;
     std::function<void()> onApply;

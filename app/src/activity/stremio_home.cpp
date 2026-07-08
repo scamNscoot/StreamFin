@@ -317,6 +317,7 @@ StremioHome::StremioHome() {
     // Background is the ocean gradient painted in draw().
 
     auto* scroll = new brls::ScrollingFrame();
+    this->homeScroll = scroll;
     scroll->setGrow(1.0f);
     scroll->setScrollingIndicatorVisible(false);
     // Centered scrolling: every Down/Up press hops one row (which is then
@@ -489,6 +490,9 @@ void StremioHome::rebuildRows() {
     this->boxHome->invalidate();
 
     this->setFocusable(false);
+    // Jump the vertical scroll to the top instantly — letting the focus move
+    // animate it caused a visible jolt after closing the editor.
+    if (this->homeScroll) this->homeScroll->setContentOffsetY(0, false);
     brls::sync([this]() {
         if (this->favRec) brls::Application::giveFocus(this->favRec);
     });
@@ -566,6 +570,10 @@ void StremioHome::addFavouritesRow() {
         Favourites::instance().changed()->subscribe([this]() {
             brls::sync([this]() { this->refreshFavourites(); });
         });
+    // Both rows are built now; later rebuilds must not stack subscriptions.
+    // (Setting this in addContinueRow broke the library row: it runs first,
+    // so the favourites subscription was skipped and new saves never showed.)
+    this->rowsSubscribed = true;
     this->refreshFavourites();
 }
 
@@ -609,7 +617,6 @@ void StremioHome::addContinueRow() {
     this->boxHome->addView(this->continueRec);
 
     if (!this->rowsSubscribed) ResumeTracker::instance().changed()->subscribe([this]() { this->refreshContinue(); });
-    this->rowsSubscribed = true;
     this->refreshContinue();
 }
 
