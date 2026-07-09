@@ -67,8 +67,9 @@ on your SD card. Every push to this repo builds a fresh release automatically.
   full grid with **search** and **sort** (recent / name / year / rating)
 
 ### Watch
-- **Continue Watching** — resumes exactly where you left off; when you stop playback you're
-  dropped straight back onto the Continue Watching row
+- **Continue Watching** — a home row that resumes any in-progress title exactly where you
+  left off; exiting the player returns you to the stream picker so you can hop straight to
+  the next episode
 - **Title details** — poster, year, runtime, ★ rating, genres, description (with a **See more**
   that opens a fully scrollable synopsis), cast and director
 - **Series & anime** — seasons → episodes with thumbnails, titles, air dates and per-episode

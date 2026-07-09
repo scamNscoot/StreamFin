@@ -35,8 +35,6 @@ public:
     // fetched from Cinemeta). Persists silently; does NOT fire changed().
     void updateMeta(const std::string& streamId, const std::string& name, const std::string& poster);
     brls::VoidEvent* changed() { return &changedEvent; }
-    // True while a stremio stream is (still) the active playback item.
-    bool isPlaying() const { return hasCurrent; }
 
 private:
     void load();

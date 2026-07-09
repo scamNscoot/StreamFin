@@ -337,18 +337,9 @@ StremioHome::StremioHome() {
 
     this->addView(scroll);
 
-    // When stremio playback stops (B in the player or the file ended), close
-    // the stream picker / detail screens too and land back on the home screen
-    // with the Continue Watching row focused. Must be subscribed BEFORE
-    // ResumeTracker::init(), whose own MPV_STOP handler clears isPlaying().
     this->addTopBar();
 
     Favourites::instance().load();
-    MPVCore::instance().getEvent()->subscribe([this](MpvEventEnum e) {
-        if (e != MpvEventEnum::MPV_STOP && e != MpvEventEnum::END_OF_FILE) return;
-        if (!ResumeTracker::instance().isPlaying()) return;
-        brls::sync([this]() { this->popToHome(); });
-    });
     ResumeTracker::instance().init();
     this->addContinueRow();
     this->addFavouritesRow();
@@ -389,14 +380,6 @@ bool StremioHome::parkFocus(brls::View* avoid) {
     return false;
 }
 
-// Pop one activity per frame until home is on top, then focus Continue Watching.
-void StremioHome::popToHome() {
-    if (brls::Application::popActivity(brls::TransitionAnimation::NONE)) {
-        brls::sync([this]() { this->popToHome(); });
-    } else if (this->continueRec && this->continueRec->getVisibility() == brls::Visibility::VISIBLE) {
-        brls::sync([this]() { brls::Application::giveFocus(this->continueRec); });
-    }
-}
 
 // Top bar: small Stremio logo on the left, a round search button on the
 // right. Lives inside the scrolled column, so it scrolls away with the rows.

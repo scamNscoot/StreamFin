@@ -44,9 +44,9 @@ jobs:
     - name: Release
       uses: softprops/action-gh-release@v2
       with:
-        name: StreamFinEX v0.3.8
-        tag_name: v0.3.8
+        name: StreamFinEX v0.3.9
+        tag_name: v0.3.9
         files: build/StreamFin.nro
         body: |
-          Library row updates live again; 3-column row editor with counter; no jolt after closing the editor.
+          Exiting the player returns to the stream picker (episode-to-episode flow) instead of jumping home.
           Copy `StreamFin.nro` to `/switch/` on your SD card.
