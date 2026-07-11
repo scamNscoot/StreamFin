@@ -40,7 +40,8 @@ void promptForAddon(const std::string& initial) {
             brls::Application::notify("Stream addon saved");
         },
         "Stream addon URL",
-        "Type your addon URL — or easier: put it in a text file at switch/streamfin-addon.txt on the SD card and relaunch",
+        "Type your addon URL — or easier: put it in a text file at switch/streamfin-addon.txt on the SD card and relaunch "
+        "(one URL per line; multiple lines = multiple addons, keyboard sets one)",
         1024, initial, 0);
 }
 
@@ -157,21 +158,20 @@ public:
 
     void onItemSelected(brls::Box* recycler, size_t index) override {
         auto e = this->list.at(index);
-        if (stremio::STREAM_ADDON.empty()) {
+        if (stremio::STREAM_ADDONS.empty()) {
             brls::Application::notify("Set your stream addon first (press −)");
             return;
         }
         brls::Application::notify("Finding streams…");
-        std::string url = stremio::STREAM_ADDON + "/stream/" + e.streamType + "/" + e.streamId + ".json";
-        stremio::getJSON<stremio::StreamList>(
-            [e](stremio::StreamList r) {
-                if (r.streams.empty()) {
+        stremio::getStreams(e.streamType, e.streamId,
+            [e](std::vector<stremio::Stream> streams) {
+                if (streams.empty()) {
                     brls::Application::notify("No streams found");
                     return;
                 }
-                brls::Application::pushActivity(new brls::Activity(new StreamPicker(e.name, r.streams, e)));
+                brls::Application::pushActivity(new brls::Activity(new StreamPicker(e.name, streams, e)));
             },
-            [](const std::string& err) { brls::Application::notify("Stream error: " + err); }, url);
+            [](const std::string& err) { brls::Application::notify("Stream error: " + err); });
     }
 
     void clearData() override { this->list.clear(); }
@@ -235,10 +235,10 @@ StremioHome::StremioHome() {
     // − sets/changes the stream addon URL; also prompts automatically on
     // first launch (deferred a frame so the window is up).
     this->registerAction("Stream Addon", brls::BUTTON_BACK, [](brls::View*) {
-        promptForAddon(stremio::STREAM_ADDON);
+        promptForAddon(stremio::STREAM_ADDONS.empty() ? "" : stremio::STREAM_ADDONS.front());
         return true;
     });
-    if (stremio::STREAM_ADDON.empty())
+    if (stremio::STREAM_ADDONS.empty())
         brls::sync([]() { promptForAddon(""); });
 }
 

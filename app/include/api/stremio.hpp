@@ -20,6 +20,7 @@
 #include <sys/stat.h>
 #include <regex>
 #include <vector>
+#include <set>
 #include <algorithm>
 #include <cctype>
 #include <cstring>
@@ -57,14 +58,17 @@ inline std::vector<std::string> jstrlist(const nlohmann::json& j, const char* ke
 // Cinemeta: public catalog + metadata addon (browse / search / details).
 inline const std::string CINEMETA = "https://v3-cinemeta.strem.io";
 
-// The user's stream addon (AIOStreams, Torrentio, or anything implementing the
-// Stremio "stream" resource). The base is everything BEFORE "/manifest.json".
-// Stream requests look like:
-//   {STREAM_ADDON}/stream/movie/{imdbId}.json
-//   {STREAM_ADDON}/stream/series/{imdbId}:{season}:{episode}.json
-// Set on first launch via the on-screen keyboard, persisted in the config
-// directory. Empty until the user provides one (catalog browsing still works).
-inline std::string STREAM_ADDON;
+// The user's stream addons (AIOStreams, Torrentio, or anything implementing
+// the Stremio "stream" resource). Each base is everything BEFORE
+// "/manifest.json". Stream requests look like:
+//   {addon}/stream/movie/{imdbId}.json
+//   {addon}/stream/series/{imdbId}:{season}:{episode}.json
+// Multiple addons are supported (one bare URL line each in
+// streamfin-addon.txt); on play, ALL of them are queried and the results
+// merged in this order. Set on first launch via the on-screen keyboard (single
+// addon) or the text file, persisted in the config directory. Empty until the
+// user provides one (catalog browsing still works).
+inline std::vector<std::string> STREAM_ADDONS;
 
 // Optional poster provider: a URL template with an {imdbId} placeholder,
 // e.g. RPDB's rating-embedded posters. When set, all poster images load from
@@ -131,8 +135,10 @@ inline void saveConfig(const std::string& configDir) {
     try {
         std::ofstream out(addonConfigPath(configDir));
         if (out.is_open())
-            out << nlohmann::json{
-                       {"url", STREAM_ADDON}, {"poster", POSTER_TEMPLATE}, {"subtitles", SUBTITLES_ADDON}}
+            // "url" (first addon) is kept alongside "urls" so a config written
+            // by this version still works if an older build reads it.
+            out << nlohmann::json{{"url", STREAM_ADDONS.empty() ? "" : STREAM_ADDONS.front()},
+                       {"urls", STREAM_ADDONS}, {"poster", POSTER_TEMPLATE}, {"subtitles", SUBTITLES_ADDON}}
                        .dump(2);
     } catch (const std::exception& e) {
         brls::Logger::warning("saveConfig: {}", e.what());
@@ -145,7 +151,16 @@ inline void loadAddon(const std::string& configDir) {
         if (!in.is_open()) return;
         nlohmann::json j;
         in >> j;
-        STREAM_ADDON = normalizeAddonUrl(jstr(j, "url"));
+        // New format: "urls" array. Old format (pre-multi-addon): "url" string.
+        STREAM_ADDONS.clear();
+        for (auto& u : jstrlist(j, "urls")) {
+            std::string n = normalizeAddonUrl(u);
+            if (!n.empty()) STREAM_ADDONS.push_back(n);
+        }
+        if (STREAM_ADDONS.empty()) {
+            std::string n = normalizeAddonUrl(jstr(j, "url"));
+            if (!n.empty()) STREAM_ADDONS.push_back(n);
+        }
         POSTER_TEMPLATE = normalizePosterTemplate(jstr(j, "poster"));
         SUBTITLES_ADDON = normalizeAddonUrl(jstr(j, "subtitles"));
     } catch (const std::exception& e) {
@@ -154,13 +169,16 @@ inline void loadAddon(const std::string& configDir) {
 }
 
 inline void saveAddon(const std::string& configDir, const std::string& url) {
-    STREAM_ADDON = normalizeAddonUrl(url);
+    STREAM_ADDONS.clear();
+    std::string n = normalizeAddonUrl(url);
+    if (!n.empty()) STREAM_ADDONS.push_back(n);
     saveConfig(configDir);
 }
 
 // Easier setup than typing on the on-screen keyboard: the user drops a
 // plain-text file on the SD card. Line format (any order, all optional):
-//   https://your-stream-addon...      the stream addon base URL
+//   https://your-stream-addon...      a stream addon base URL — repeat the
+//                                     line to use several addons at once
 //   rpdb=YOUR_KEY                     rated posters via RatingPosterDB
 //   poster=https://...{imdbId}...     any custom poster provider template
 // Checked at every launch; when the file exists it is the source of truth
@@ -174,7 +192,8 @@ inline void importAddonFromFile(const std::string& configDir) {
         std::ifstream in(path);
         if (!in.is_open()) continue;
 
-        std::string url, poster, subs, line;
+        std::vector<std::string> urls;
+        std::string poster, subs, line;
         while (std::getline(in, line)) {
             line = trimJunk(line);
             if (line.rfind("poster=", 0) == 0) {
@@ -186,16 +205,18 @@ inline void importAddonFromFile(const std::string& configDir) {
                 subs = normalizeAddonUrl(line.substr(10));
             } else if (!line.empty() && line[0] != '#') {
                 std::string u = normalizeAddonUrl(line);
-                if (!u.empty()) url = u;
+                // Every bare URL line is an addon; skip exact repeats.
+                if (!u.empty() && std::find(urls.begin(), urls.end(), u) == urls.end())
+                    urls.push_back(u);
             }
         }
 
         // The file is the source of truth: apply all values (an absent
-        // rpdb/poster/subtitles line turns that feature off again). A missing
-        // addon line never wipes a working addon URL.
-        std::string effectiveUrl = url.empty() ? STREAM_ADDON : url;
-        if (effectiveUrl != STREAM_ADDON || poster != POSTER_TEMPLATE || subs != SUBTITLES_ADDON) {
-            STREAM_ADDON = effectiveUrl;
+        // rpdb/poster/subtitles line turns that feature off again). Missing
+        // addon lines never wipe a working addon list.
+        std::vector<std::string> effective = urls.empty() ? STREAM_ADDONS : urls;
+        if (effective != STREAM_ADDONS || poster != POSTER_TEMPLATE || subs != SUBTITLES_ADDON) {
+            STREAM_ADDONS = effective;
             POSTER_TEMPLATE = poster;
             SUBTITLES_ADDON = subs;
             saveConfig(configDir);
@@ -305,6 +326,59 @@ struct StreamList {
     std::vector<Stream> streams;
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(StreamList, streams);
+
+// Fetch /stream/{type}/{id}.json from EVERY configured addon in parallel and
+// merge the results in addon order (first addon in the file wins ties).
+// Duplicate stream URLs are dropped — AIOStreams commonly wraps Torrentio, so
+// the same debrid link can come back from both. Per-addon failures are
+// tolerated: the merged list is delivered as long as at least one addon
+// answered; error() fires only when every addon failed. All getJSON callbacks
+// arrive on the UI thread, so the shared state needs no locking.
+inline void getStreams(const std::string& type, const std::string& id,
+    std::function<void(std::vector<Stream>)> then, OnError error) {
+    struct Agg {
+        std::vector<std::vector<Stream>> results;
+        size_t pending;
+        bool anyOk = false;
+        std::string lastErr;
+    };
+    if (STREAM_ADDONS.empty()) {  // call sites check first; belt-and-braces
+        if (error) error("no stream addon configured");
+        return;
+    }
+    auto agg = std::make_shared<Agg>();
+    agg->results.resize(STREAM_ADDONS.size());
+    agg->pending = STREAM_ADDONS.size();
+
+    auto finish = [agg, then, error]() {
+        if (--agg->pending > 0) return;
+        std::vector<Stream> merged;
+        std::set<std::string> seen;
+        for (auto& r : agg->results)
+            for (auto& s : r)
+                if (s.url.empty() || seen.insert(s.url).second) merged.push_back(s);
+        if (!agg->anyOk) {
+            if (error) error(agg->lastErr);
+            return;
+        }
+        if (then) then(std::move(merged));
+    };
+
+    for (size_t i = 0; i < STREAM_ADDONS.size(); ++i) {
+        std::string url = STREAM_ADDONS[i] + "/stream/" + type + "/" + id + ".json";
+        getJSON<StreamList>(
+            [agg, i, finish](StreamList r) {
+                agg->results[i] = std::move(r.streams);
+                agg->anyOk = true;
+                finish();
+            },
+            [agg, finish](const std::string& e) {
+                agg->lastErr = e;
+                finish();
+            },
+            url);
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Stream display parsing (for a clean, readable picker)

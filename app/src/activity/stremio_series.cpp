@@ -103,7 +103,7 @@ public:
 
     void onItemSelected(brls::Box* recycler, size_t index) override {
         auto v = this->list.at(index);
-        if (stremio::STREAM_ADDON.empty()) {
+        if (stremio::STREAM_ADDONS.empty()) {
             brls::Application::notify("Set your stream addon first (press − on the home screen)");
             return;
         }
@@ -114,17 +114,16 @@ public:
         std::string label = this->seriesName.empty()
             ? fmt::format("S{}E{} · {}", v.season, v.episode, v.name)
             : fmt::format("{} · S{}E{} · {}", this->seriesName, v.season, v.episode, v.name);
-        std::string url = stremio::STREAM_ADDON + "/stream/series/" + v.id + ".json";
         ResumeEntry key{"series", v.id, label, v.thumbnail};
-        stremio::getJSON<stremio::StreamList>(
-            [label, key](stremio::StreamList r) {
-                if (r.streams.empty()) {
+        stremio::getStreams("series", v.id,
+            [label, key](std::vector<stremio::Stream> streams) {
+                if (streams.empty()) {
                     brls::Application::notify("No streams found");
                     return;
                 }
-                brls::Application::pushActivity(new brls::Activity(new StreamPicker(label, r.streams, key)));
+                brls::Application::pushActivity(new brls::Activity(new StreamPicker(label, streams, key)));
             },
-            [](const std::string& e) { brls::Application::notify("Stream error: " + e); }, url);
+            [](const std::string& e) { brls::Application::notify("Stream error: " + e); });
     }
 
     void clearData() override { this->list.clear(); }

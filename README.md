@@ -43,18 +43,23 @@ addon URL**, which the app asks for on first launch.
 2. **Recommended:** while the SD card is still in your PC, create a plain-text file at
    `/switch/streamfin-addon.txt` containing your **stream addon URL** — the base URL of any
    Stremio addon that implements the `stream` resource (with or without `/manifest.json`).
-   StreamFin imports it automatically at launch — no typing on the console. Editing the file
-   later updates the settings too. Full format (all lines optional, `#` for comments):
+   You can list **several stream addons, one per line** — when you pick something to watch,
+   all of them are queried at once and the results merged into one picker (duplicate links
+   removed). StreamFin imports the file automatically at launch — no typing on the console.
+   Editing the file later updates the settings too. Full format (all lines optional, `#` for
+   comments):
 
    ```
    https://your-stream-addon.example.com/...
+   https://another-stream-addon.example.com/...
    rpdb=YOUR_RPDB_KEY
    subtitles=https://your-subtitles-addon.example.com/...
    ```
 3. Alternatively, launch without the file and type the URL into the on-screen keyboard when
-   prompted (works, but long addon URLs are painful to type).
+   prompted (works, but long addon URLs are painful to type; the keyboard sets a single
+   addon — use the text file for multiple).
 4. Change it any time by pressing **−** on the home screen, or by editing the text file. The
-   active URL is stored at `sdmc:/config/StreamFin/stremio_addon.json`.
+   active URLs are stored at `sdmc:/config/StreamFin/stremio_addon.json`.
 
 Catalog browsing works without an addon; you only need one to actually play streams.
 

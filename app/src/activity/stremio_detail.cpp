@@ -247,7 +247,7 @@ void StremioDetail::onAction() {
 
 void StremioDetail::openStreams() {
     if (this->fetching) return;  // ignore repeat presses while a request runs
-    if (stremio::STREAM_ADDON.empty()) {
+    if (stremio::STREAM_ADDONS.empty()) {
         brls::Application::notify("Set your stream addon first (press − on the home screen)");
         return;
     }
@@ -255,24 +255,22 @@ void StremioDetail::openStreams() {
     brls::Application::notify("Finding streams…");
 
     std::string name = this->item.name;
-    std::string url = stremio::STREAM_ADDON + "/stream/" + this->item.type + "/" + this->item.id + ".json";
     ResumeEntry key{this->item.type, this->item.id, this->item.name, this->item.poster};
 
     ASYNC_RETAIN
-    stremio::getJSON<stremio::StreamList>(
-        [ASYNC_TOKEN, name, key](stremio::StreamList r) {
+    stremio::getStreams(this->item.type, this->item.id,
+        [ASYNC_TOKEN, name, key](std::vector<stremio::Stream> streams) {
             ASYNC_RELEASE
             this->fetching = false;
-            if (r.streams.empty()) {
+            if (streams.empty()) {
                 brls::Application::notify("No streams found");
                 return;
             }
-            brls::Application::pushActivity(new brls::Activity(new StreamPicker(name, r.streams, key)));
+            brls::Application::pushActivity(new brls::Activity(new StreamPicker(name, streams, key)));
         },
         [ASYNC_TOKEN](const std::string& e) {
             ASYNC_RELEASE
             this->fetching = false;
             brls::Application::notify("Stream error: " + e);
-        },
-        url);
+        });
 }
