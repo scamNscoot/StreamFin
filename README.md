@@ -63,6 +63,13 @@ addon URL**, which the app asks for on first launch.
 
 Catalog browsing works without an addon; you only need one to actually play streams.
 
+> [!IMPORTANT]
+> **A debrid service is required for torrent addons.** StreamFin has no built-in torrent
+> engine (unlike desktop Stremio) — it can only play direct HTTP(S) links. Torrent addons
+> such as Torrentio must be configured with a debrid service (Real-Debrid, Premiumize,
+> AllDebrid, …) so they return direct links. Without one, every result is a raw torrent
+> and the stream picker will report there is nothing playable.
+
 ### Poster ratings (optional)
 
 Out of the box, every poster shows a small **★ IMDb badge** using data already present in the

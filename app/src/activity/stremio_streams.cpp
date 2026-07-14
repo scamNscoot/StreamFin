@@ -183,13 +183,23 @@ StreamPicker::StreamPicker(
     // real streams — "Removal Reasons", "no results", etc. — with no URL.
     // Keep only playable streams so the user can't select a dead entry.
     std::vector<stremio::Stream> playable;
-    for (auto& s : streams)
-        if (!s.url.empty()) playable.push_back(s);
+    bool torrentOnly = false;
+    for (auto& s : streams) {
+        if (!s.url.empty())
+            playable.push_back(s);
+        else if (!s.infoHash.empty())
+            torrentOnly = true;  // raw torrent result — no engine to play it
+    }
 
     if (playable.empty()) {
-        // Everything the addon offered was filtered out (often by the addon's
-        // own quality/resolution filters). Point the user at the real cause.
-        this->recycler->setEmpty("No playable streams — check your addon's quality/resolution filters");
+        // Everything the addon offered was filtered out. Raw torrent results
+        // (infoHash, no URL) mean the addon has no debrid service configured —
+        // the most common misconfiguration, worth calling out specifically.
+        this->recycler->setEmpty(
+            torrentOnly ? "These are raw torrent streams, which this app can't play.\n"
+                          "Configure your addon with a debrid service (Real-Debrid, Premiumize, "
+                          "AllDebrid…) so it returns direct links."
+                        : "No playable streams — check your addon's quality/resolution filters");
     } else {
         this->recycler->setDataSource(new StreamSource(resumeKey, playable));
     }

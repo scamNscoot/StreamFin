@@ -313,12 +313,14 @@ struct Stream {
     std::string title;        // detailed label (older addons)
     std::string description;  // detailed label (newer addons, incl. AIOStreams)
     std::string url;          // <-- the playable (debrid) URL we hand to MPV
+    std::string infoHash;     // raw torrent result (no debrid) — not playable here
 };
 inline void from_json(const nlohmann::json& j, Stream& s) {
     s.name = jstr(j, "name");
     s.title = jstr(j, "title");
     s.description = jstr(j, "description");
     s.url = jstr(j, "url");
+    s.infoHash = jstr(j, "infoHash");
 }
 
 // Response of /stream/{type}/{id}.json
