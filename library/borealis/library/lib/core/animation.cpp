@@ -109,7 +109,9 @@ void updateHighlightAnimation()
     // Update variables
     highlightGradientX = (cos((double)currentTime / HIGHLIGHT_SPEED / 3.0) + 1.0) / 2.0;
     highlightGradientY = (sin((double)currentTime / HIGHLIGHT_SPEED / 3.0) + 1.0) / 2.0;
-    highlightColor     = (sin((double)currentTime / HIGHLIGHT_SPEED * 2.0) + 1.0) / 2.0;
+    // Slow breathing (~2.4s period) — the stock *2.0 phase flashed too fast
+    // now that the border/glow actually change colour with it.
+    highlightColor     = (sin((double)currentTime / HIGHLIGHT_SPEED / 3.0) + 1.0) / 2.0;
 }
 
 void getHighlightAnimation(float* gradientX, float* gradientY, float* color)

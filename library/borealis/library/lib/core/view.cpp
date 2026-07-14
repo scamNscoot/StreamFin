@@ -619,16 +619,37 @@ void View::drawHighlight(NVGcontext* vg, Theme theme, float alpha, Style style, 
         getHighlightAnimation(&gradientX, &gradientY, &color);
 
         NVGcolor highlightColor1 = theme["brls/highlight/color1"];
+        NVGcolor highlightColor2 = theme["brls/highlight/color2"];
 
-        NVGcolor pulsationColor = RGBAf((color * highlightColor1.r) + (1 - color) * highlightColor1.r,
-            (color * highlightColor1.g) + (1 - color) * highlightColor1.g,
-            (color * highlightColor1.b) + (1 - color) * highlightColor1.b,
+        // Border color breathes between the two theme highlight colors.
+        NVGcolor pulsationColor = RGBAf((color * highlightColor1.r) + (1 - color) * highlightColor2.r,
+            (color * highlightColor1.g) + (1 - color) * highlightColor2.g,
+            (color * highlightColor1.b) + (1 - color) * highlightColor2.b,
             alpha);
 
         NVGcolor borderColor = theme["brls/highlight/color2"];
         borderColor.a        = 0.5f * alpha * this->getAlpha();
 
         float strokeWidth = style["brls/highlight/stroke_width"];
+
+        // Accent glow: a soft halo bleeding outward from the border, breathing
+        // with the pulse phase, so the focused view visibly glows.
+        float glowSpread    = strokeWidth * 9;
+        NVGcolor glowColor  = pulsationColor;
+        glowColor.a         = (0.35f + 0.30f * color) * alpha * this->getAlpha();
+        NVGpaint glowPaint  = nvgBoxGradient(vg,
+            x - strokeWidth, y - strokeWidth,
+            width + strokeWidth * 2, height + strokeWidth * 2,
+            cornerRadius * 2, glowSpread,
+            glowColor, TRANSPARENT);
+
+        nvgBeginPath(vg);
+        nvgRect(vg, x - glowSpread * 2, y - glowSpread * 2,
+            width + glowSpread * 4, height + glowSpread * 4);
+        nvgRoundedRect(vg, x, y, width, height, cornerRadius);
+        nvgPathWinding(vg, NVG_HOLE);
+        nvgFillPaint(vg, glowPaint);
+        nvgFill(vg);
 
         NVGpaint border1Paint = nvgRadialGradient(vg,
             x + gradientX * width, y + gradientY * height,
