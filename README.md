@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="images/logo.jpg" alt="StreamFin" width="180" />
+  <img src="images/logo-v2.jpg" alt="StreamFin" width="180" />
 </p>
 
 <h1 align="center">StreamFin</h1>
