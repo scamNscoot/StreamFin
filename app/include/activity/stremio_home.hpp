@@ -21,6 +21,7 @@ private:
     void addRow(const std::string& title, const std::string& url);
     void buildCatalogRows();    // one carousel per enabled registry row
     void rebuildCatalogRows();  // tear down + rebuild after the registry changed
+    void onChildFocusGained(brls::View* directChild, brls::View* focusedView) override;
     void addFavouritesRow();
     void refreshFavourites();
     void addContinueRow();
@@ -35,5 +36,6 @@ private:
     HRecyclerFrame* firstRowRec = nullptr;  // first catalog row; safe focus parking spot
     std::vector<brls::View*> catalogViews;      // headers + carousels of the catalog rows
     brls::Event<>::Subscription catalogsSub;    // CATALOGS_CHANGED subscription (always set in ctor)
+    bool pendingRebuild = false;            // registry changed while home was covered
     bool continueEnriching = false;         // a Cinemeta title-refresh pass is in flight
 };

@@ -280,6 +280,18 @@ void StremioHome::buildCatalogRows() {
 }
 
 void StremioHome::rebuildCatalogRows() {
+    // While another screen is on top (Catalogs, detail, player), borealis'
+    // focus stack holds a pointer to the home view that had focus — and
+    // popActivity gives focus back to that exact pointer. Destroying rows now
+    // would leave it dangling (ghost highlight, then a crash on back).
+    // Defer; onChildFocusGained fires the rebuild once focus returns to home.
+    auto stack = brls::Application::getActivitiesStack();
+    if (!stack.empty() && this->getParentActivity() != stack.back()) {
+        this->pendingRebuild = true;
+        return;
+    }
+    this->pendingRebuild = false;
+
     // Same focus-parking discipline as refreshFavourites/refreshContinue:
     // never leave focus on a view that's about to be destroyed.
     bool focusHere = false;
@@ -307,6 +319,14 @@ void StremioHome::rebuildCatalogRows() {
     // Force a clean relayout — stale yoga incremental layout after toggling
     // row visibility is this screen's oldest bug (see refreshFavourites).
     this->boxHome->invalidate();
+}
+
+void StremioHome::onChildFocusGained(brls::View* directChild, brls::View* focusedView) {
+    brls::Box::onChildFocusGained(directChild, focusedView);
+    // Focus coming back into home (e.g. the Catalogs screen was just popped)
+    // with a deferred registry change: rebuild now. Next frame, so the
+    // focus restore fully settles first.
+    if (this->pendingRebuild) brls::sync([this]() { this->rebuildCatalogRows(); });
 }
 
 void StremioHome::addFavouritesRow() {
