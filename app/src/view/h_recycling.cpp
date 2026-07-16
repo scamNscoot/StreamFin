@@ -39,6 +39,35 @@ brls::View* HRecyclerFrame::getNextCellFocus(brls::FocusDirection direction, brl
     return currentFocus;
 }
 
+// Nuvio/Netflix-style rows: entering a row must not drag it sideways, and
+// horizontal movement only scrolls when the focused poster would leave the
+// screen. Run the stock handler first — it keeps the scroller's internal
+// state (childFocused etc.) correct and starts its centered-scroll animation
+// — then immediately re-aim that animation at a scroll-into-view target
+// computed from the cell's real position. A poster already fully on screen
+// yields target == current offset, so the row doesn't move at all.
+void HRecyclerFrame::onChildFocusGained(brls::View* directChild, brls::View* focusedView) {
+    HScrollingFrame::onChildFocusGained(directChild, focusedView);
+
+    RecyclingGridItem* cell = dynamic_cast<RecyclingGridItem*>(focusedView);
+    if (!cell || !this->dataSource) return;
+
+    float visibleWidth = this->getWidth();
+    float contentWidth = this->contentBox->getWidth();
+    if (visibleWidth <= 0 || contentWidth <= visibleWidth) return;
+
+    float cellLeft = cell->getDetachedPosition().x;
+    float cellRight = cellLeft + estimatedRowWidth;
+
+    float target = getContentOffsetX();
+    if (cellRight + paddingRight - target > visibleWidth)
+        target = cellRight + paddingRight - visibleWidth;  // bring in from the right
+    if (cellLeft - paddingLeft - target < 0) target = cellLeft - paddingLeft;  // bring in from the left
+    if (target > contentWidth - visibleWidth) target = contentWidth - visibleWidth;
+    if (target < 0) target = 0;
+    setContentOffsetX(target, true);
+}
+
 void HRecyclerFrame::focusNearest(float x) {
     brls::View* nearest = nullptr;
     float nearestDist = 0;
