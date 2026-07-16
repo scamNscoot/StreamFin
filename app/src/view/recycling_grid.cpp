@@ -27,7 +27,9 @@ RecyclingGridItem::~RecyclingGridItem() = default;
 
 /// Skeleton cell
 
-SkeletonCell::SkeletonCell() { this->setFocusable(false); }
+// Focusable so a still-loading row can take (and park) focus — the home-row
+// rebuild relies on this; clicking one is a no-op (DataSourceSkeleton).
+SkeletonCell::SkeletonCell() { this->setFocusable(true); }
 
 RecyclingGridItem* SkeletonCell::create() { return new SkeletonCell(); }
 

@@ -268,7 +268,21 @@ void StremioHome::addRow(const std::string& title, const std::string& url) {
             // still one of ours.
             auto& live = this->catalogViews;
             if (std::find(live.begin(), live.end(), (brls::View*)rec) == live.end()) return;
-            if (!r.metas.empty()) rec->setDataSource(new StremioSource(r.metas));
+            if (r.metas.empty()) return;
+            bool focusHere = false;
+            for (brls::View* f = brls::Application::getCurrentFocus(); f != nullptr; f = f->getParent())
+                if (f == rec) {
+                    focusHere = true;
+                    break;
+                }
+            rec->setDataSource(new StremioSource(r.metas));
+            // Focus sat on this row's skeleton (parked there during a rebuild):
+            // re-land it on the real first cell now that the data is in.
+            if (focusHere) brls::sync([this, rec]() {
+                auto& v = this->catalogViews;
+                if (std::find(v.begin(), v.end(), (brls::View*)rec) != v.end())
+                    brls::Application::giveFocus(rec);
+            });
         },
         [ASYNC_TOKEN, rec](const std::string&) { ASYNC_RELEASE },
         url);
