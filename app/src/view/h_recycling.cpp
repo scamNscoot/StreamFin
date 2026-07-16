@@ -39,31 +39,6 @@ brls::View* HRecyclerFrame::getNextCellFocus(brls::FocusDirection direction, brl
     return currentFocus;
 }
 
-// Scroll-into-view instead of the stock centered scrolling: the row only
-// moves when the focused poster would leave the viewport, and offsets snap to
-// whole cells so a poster is never split in half at the left edge. Entering a
-// row on the nearest column therefore causes no sideways jump at all.
-// Deliberately skips HScrollingFrame::onChildFocusGained (which recenters).
-void HRecyclerFrame::onChildFocusGained(brls::View* directChild, brls::View* focusedView) {
-    brls::Box::onChildFocusGained(directChild, focusedView);
-
-    RecyclingGridItem* cell = dynamic_cast<RecyclingGridItem*>(focusedView);
-    if (!cell || !this->dataSource) return;
-
-    float w = estimatedRowWidth + estimatedRowSpace;
-    float cellLeft = (float)cell->getIndex() * w;
-    size_t fit = (size_t)std::max(1.0f, std::floor((getWidth() - paddingLeft - paddingRight + estimatedRowSpace) / w));
-
-    float target = getContentOffsetX();
-    float maxOff = cellLeft;                      // cell flush with the left edge
-    float minOff = cellLeft - (float)(fit - 1) * w;  // cell in the last full slot
-    if (target > maxOff) target = maxOff;
-    if (target < minOff) target = minOff;
-    target = std::round(target / w) * w;  // snap to the cell grid
-    if (target < 0) target = 0;
-    setContentOffsetX(target, true);
-}
-
 void HRecyclerFrame::focusNearest(float x) {
     brls::View* nearest = nullptr;
     float nearestDist = 0;

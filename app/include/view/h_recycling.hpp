@@ -10,7 +10,6 @@ public:
     ~HRecyclerFrame();
 
     View* getNextCellFocus(brls::FocusDirection direction, View* currentView) override;
-    void onChildFocusGained(View* directChild, View* focusedView) override;
     void draw(NVGcontext* vg, float x, float y, float width, float height, brls::Style style,
         brls::FrameContext* ctx) override;
     void onLayout() override;
