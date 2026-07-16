@@ -83,6 +83,11 @@ class HScrollingFrame : public Box
 
     static View* create();
 
+  protected:
+    // Subclasses overriding onChildFocusGained need to stop or re-aim the
+    // centered-scroll animation this class starts (StreamFin HRecyclerFrame).
+    Animatable contentOffsetX = 0.0f;
+
   private:
     View* contentView             = nullptr;
     Rectangle* scrollingIndicator = nullptr;
@@ -93,8 +98,6 @@ class HScrollingFrame : public Box
 
     float middleX = 0; // y + height/2
     float rightX = 0; // y + height
-
-    Animatable contentOffsetX = 0.0f;
 
     void prebakeScrolling();
     bool updateScrolling(bool animated);
