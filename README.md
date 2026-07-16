@@ -26,10 +26,17 @@ addon URL**, which the app asks for on first launch.
 |---|---|
 | ![Season list](images/capture-seasons.jpg) | ![hbmenu](images/capture-home-menu.jpg) |
 
+| Catalogs screen (+) | Custom catalog addons |
+|---|---|
+| ![Catalogs screen](images/capture-catalogs.jpg) | ![Custom catalog addons](images/capture-catalogs-addons.jpg) |
+
 ## Features
 
 - **Home screen** — poster carousels: Popular / New / Top Rated / Animation / Documentary,
   movies & series (Cinemeta), with **IMDb rating badges** on every poster
+- **Custom catalogs** — add any Stremio **catalog addon** (`catalog=URL` in the text file) and
+  every catalog it offers becomes a home row; press **+** to toggle rows on/off and reorder
+  them (built-in rows included)
 - **Title details** — poster, year, runtime, IMDb rating, genres, description, cast, director
 - **Series support** — seasons → episodes with air dates → stream picker
 - **Search** (press Y) via the on-screen keyboard
@@ -52,6 +59,7 @@ addon URL**, which the app asks for on first launch.
    ```
    https://your-stream-addon.example.com/...
    https://another-stream-addon.example.com/...
+   catalog=https://your-catalog-addon.example.com/manifest.json
    rpdb=YOUR_RPDB_KEY
    subtitles=https://your-subtitles-addon.example.com/...
    ```
@@ -69,6 +77,19 @@ Catalog browsing works without an addon; you only need one to actually play stre
 > such as Torrentio must be configured with a debrid service (Real-Debrid, Premiumize,
 > AllDebrid, …) so they return direct links. Without one, every result is a raw torrent
 > and the stream picker will report there is nothing playable.
+
+### Custom catalogs (optional)
+
+Add any Stremio **catalog addon** to `streamfin-addon.txt` and its catalogs become home rows:
+
+```
+catalog=https://your-catalog-addon.example.com/manifest.json
+```
+
+Works with anything that implements the `catalog` resource — streaming-service catalogs,
+MDBList/Trakt lists, anime catalogs, … Repeat the line for several addons. Then press **+** on
+the home screen to open the **Catalogs** screen: toggle any row on/off (the built-in Cinemeta
+rows too) and move rows up/down with X/Y — the home screen follows your arrangement.
 
 ### Poster ratings (optional)
 
@@ -103,6 +124,9 @@ the player — pick one under **+ → Subtitle** (one per language, alongside an
 | Home | Y | Search |
 | Home | X | Add/remove favourite |
 | Home | − | Set stream addon URL |
+| Home | + | Catalogs: toggle & reorder home rows |
+| Catalogs | A | Toggle row on/off |
+| Catalogs | X / Y | Move row up / down |
 | Detail page | A on ▶ | Watch (movies) / Episodes (series) |
 | Player | L / R | Seek back / forward |
 | Player | X | Lock screen |
