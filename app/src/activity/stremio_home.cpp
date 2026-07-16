@@ -262,6 +262,12 @@ void StremioHome::addRow(const std::string& title, const std::string& url) {
     stremio::getJSON<stremio::MetaList>(
         [ASYNC_TOKEN, rec](stremio::MetaList r) {
             ASYNC_RELEASE
+            // The registry may have rebuilt the carousels while this fetch was
+            // in flight (manifest refresh on a cold start) — the recycler this
+            // callback captured could be destroyed. Only touch it if it's
+            // still one of ours.
+            auto& live = this->catalogViews;
+            if (std::find(live.begin(), live.end(), (brls::View*)rec) == live.end()) return;
             if (!r.metas.empty()) rec->setDataSource(new StremioSource(r.metas));
         },
         [ASYNC_TOKEN, rec](const std::string&) { ASYNC_RELEASE },
