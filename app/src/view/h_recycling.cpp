@@ -1,5 +1,7 @@
 #include "view/h_recycling.hpp"
 
+#include <cmath>
+
 brls::View* HRecyclerFrame::getNextCellFocus(brls::FocusDirection direction, brls::View* currentView) {
     void* parentUserData = currentView->getParentUserData();
 
@@ -35,6 +37,49 @@ brls::View* HRecyclerFrame::getNextCellFocus(brls::FocusDirection direction, brl
 
     if (!currentFocus && hasParent()) currentFocus = getParent()->getNextFocus(direction, this);
     return currentFocus;
+}
+
+// Scroll-into-view instead of the stock centered scrolling: the row only
+// moves when the focused poster would leave the viewport, and offsets snap to
+// whole cells so a poster is never split in half at the left edge. Entering a
+// row on the nearest column therefore causes no sideways jump at all.
+// Deliberately skips HScrollingFrame::onChildFocusGained (which recenters).
+void HRecyclerFrame::onChildFocusGained(brls::View* directChild, brls::View* focusedView) {
+    brls::Box::onChildFocusGained(directChild, focusedView);
+
+    RecyclingGridItem* cell = dynamic_cast<RecyclingGridItem*>(focusedView);
+    if (!cell || !this->dataSource) return;
+
+    float w = estimatedRowWidth + estimatedRowSpace;
+    float cellLeft = (float)cell->getIndex() * w;
+    size_t fit = (size_t)std::max(1.0f, std::floor((getWidth() - paddingLeft - paddingRight + estimatedRowSpace) / w));
+
+    float target = getContentOffsetX();
+    float maxOff = cellLeft;                      // cell flush with the left edge
+    float minOff = cellLeft - (float)(fit - 1) * w;  // cell in the last full slot
+    if (target > maxOff) target = maxOff;
+    if (target < minOff) target = minOff;
+    target = std::round(target / w) * w;  // snap to the cell grid
+    if (target < 0) target = 0;
+    setContentOffsetX(target, true);
+}
+
+void HRecyclerFrame::focusNearest(float x) {
+    brls::View* nearest = nullptr;
+    float nearestDist = 0;
+    for (auto* child : this->contentBox->getChildren()) {
+        brls::View* focus = child->getDefaultFocus();
+        if (!focus) continue;
+        float dist = std::fabs(focus->getFrame().getMidX() - x);
+        if (!nearest || dist < nearestDist) {
+            nearest = focus;
+            nearestDist = dist;
+        }
+    }
+    if (nearest) {
+        this->contentBox->setLastFocusedView(nearest);
+        brls::Application::giveFocus(nearest);
+    }
 }
 
 HRecyclerFrame::HRecyclerFrame() {
@@ -73,8 +118,42 @@ HRecyclerFrame::~HRecyclerFrame() {
 }
 
 brls::View* HRecyclerFrame::getDefaultFocus() {
-    if (this->dataSource && this->dataSource->getItemCount() > 0) return HScrollingFrame::getDefaultFocus();
-    return nullptr;
+    if (!this->dataSource || this->dataSource->getItemCount() == 0) return nullptr;
+
+    // Entering this row from outside (moving up/down between carousels, or
+    // focus being parked here): land on the cell visually nearest the view
+    // focus is coming from — the poster directly above/below it — instead of
+    // the row's first or last-remembered cell. A row with fewer posters
+    // naturally clamps to its closest edge cell. When focus is already inside
+    // this row (left/right movement, data refresh) keep the stock behaviour.
+    brls::View* current = brls::Application::getCurrentFocus();
+    bool focusInside = false;
+    for (brls::View* v = current; v != nullptr; v = v->getParent())
+        if (v == this) {
+            focusInside = true;
+            break;
+        }
+
+    if (current && !focusInside) {
+        float targetX = current->getFrame().getMidX();
+        brls::View* nearest = nullptr;
+        float nearestDist = 0;
+        for (auto* child : this->contentBox->getChildren()) {
+            brls::View* focus = child->getDefaultFocus();
+            if (!focus) continue;
+            float dist = std::fabs(focus->getFrame().getMidX() - targetX);
+            if (!nearest || dist < nearestDist) {
+                nearest = focus;
+                nearestDist = dist;
+            }
+        }
+        if (nearest) {
+            this->contentBox->setLastFocusedView(nearest);
+            return nearest;
+        }
+    }
+
+    return HScrollingFrame::getDefaultFocus();
 }
 
 void HRecyclerFrame::setDataSource(RecyclingGridDataSource* source) {
@@ -111,6 +190,9 @@ void HRecyclerFrame::reloadData() {
     setContentOffsetX(0, false);
 
     if (this->dataSource) {
+        // Every cell was just queued for reuse; forget the remembered focus so
+        // an empty row can never hand back a recycled cell (ghost outline).
+        if (dataSource->getItemCount() == 0) contentBox->setLastFocusedView(nullptr);
         contentBox->setWidth(
             (estimatedRowWidth + estimatedRowSpace) * dataSource->getItemCount() + paddingLeft + paddingRight);
         // 填充足够多的cell到屏幕上

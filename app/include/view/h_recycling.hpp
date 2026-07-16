@@ -10,6 +10,7 @@ public:
     ~HRecyclerFrame();
 
     View* getNextCellFocus(brls::FocusDirection direction, View* currentView) override;
+    void onChildFocusGained(View* directChild, View* focusedView) override;
     void draw(NVGcontext* vg, float x, float y, float width, float height, brls::Style style,
         brls::FrameContext* ctx) override;
     void onLayout() override;
@@ -28,6 +29,9 @@ public:
     void reloadData();
     void notifyDataChanged();
     void selectRowAt(size_t index, bool animated);
+    /// Give focus to the cell whose horizontal centre is nearest `x` (screen
+    /// coords). Used after a rebuild to put focus back without any scrolling.
+    void focusNearest(float x);
     float getWidthByCellIndex(size_t index, size_t start = 0);
 
     /// 导航到页面尾部时触发回调函数
