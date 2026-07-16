@@ -15,9 +15,12 @@ class HRecyclerFrame;
 class StremioHome : public brls::Box {
 public:
     StremioHome();
+    ~StremioHome() override;
 
 private:
     void addRow(const std::string& title, const std::string& url);
+    void buildCatalogRows();    // one carousel per enabled registry row
+    void rebuildCatalogRows();  // tear down + rebuild after the registry changed
     void addFavouritesRow();
     void refreshFavourites();
     void addContinueRow();
@@ -30,5 +33,7 @@ private:
     brls::Label* continueHeader = nullptr;  // "Continue Watching" title (hidden when empty)
     HRecyclerFrame* continueRec = nullptr;  // continue-watching carousel
     HRecyclerFrame* firstRowRec = nullptr;  // first catalog row; safe focus parking spot
+    std::vector<brls::View*> catalogViews;      // headers + carousels of the catalog rows
+    brls::Event<>::Subscription catalogsSub;    // CATALOGS_CHANGED subscription (always set in ctor)
     bool continueEnriching = false;         // a Cinemeta title-refresh pass is in flight
 };

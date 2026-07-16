@@ -12,10 +12,12 @@
 #include <nlohmann/json.hpp>
 #include <borealis/core/logger.hpp>
 #include <borealis/core/thread.hpp>
+#include <borealis/core/event.hpp>
 #include "api/http.hpp"
 
 #include <thread>
 #include <chrono>
+#include <ctime>
 #include <fstream>
 #include <sys/stat.h>
 #include <regex>
@@ -82,6 +84,76 @@ inline std::string POSTER_TEMPLATE;
 // Requests look like: {SUBTITLES_ADDON}/subtitles/{type}/{id}.json
 inline std::string SUBTITLES_ADDON;
 
+// ---------------------------------------------------------------------------
+// Home catalog rows
+// ---------------------------------------------------------------------------
+// Every carousel on the home screen is one entry here: the built-in Cinemeta
+// rows plus every catalog offered by the user's catalog addons ("catalog=URL"
+// lines in streamfin-addon.txt). The registry is ordered and persisted, so
+// the user can toggle rows on/off and rearrange them (+ on the home screen).
+
+struct CatalogRowDef {
+    std::string key;    // stable identity: "cinemeta:<slug>" or "<addonBase>|<type>|<id>"
+    std::string title;  // row header, e.g. "Netflix Movies"
+    std::string url;    // full catalog JSON URL
+    bool enabled = true;
+};
+
+inline std::vector<CatalogRowDef> CATALOG_ROWS;    // ordered row registry
+inline std::vector<std::string> CATALOG_ADDONS;    // catalog addon base URLs
+
+// Fired (on the UI thread) whenever the registry changes after the home
+// screen may already be built — addon manifests arriving, edits in the
+// Catalogs screen. Home rebuilds its carousels on this.
+inline brls::Event<> CATALOGS_CHANGED;
+
+// The stock Cinemeta rows. Rebuilt every launch so the "New" rows roll over
+// to the current year without the stored config going stale.
+inline std::vector<CatalogRowDef> builtinCatalogRows() {
+    std::time_t now = std::time(nullptr);
+    std::string year = std::to_string(1900 + std::localtime(&now)->tm_year);
+    return {
+        {"cinemeta:popular-movies", "Popular Movies", CINEMETA + "/catalog/movie/top.json"},
+        {"cinemeta:popular-series", "Popular Series", CINEMETA + "/catalog/series/top.json"},
+        {"cinemeta:new-movies", "New Movies", CINEMETA + "/catalog/movie/year/genre=" + year + ".json"},
+        {"cinemeta:new-series", "New Series", CINEMETA + "/catalog/series/year/genre=" + year + ".json"},
+        {"cinemeta:top-movies", "Top Rated Movies", CINEMETA + "/catalog/movie/imdbRating.json"},
+        {"cinemeta:top-series", "Top Rated Series", CINEMETA + "/catalog/series/imdbRating.json"},
+        {"cinemeta:animation-movies", "Animation Movies", CINEMETA + "/catalog/movie/top/genre=Animation.json"},
+        {"cinemeta:animation-series", "Animation Series", CINEMETA + "/catalog/series/top/genre=Animation.json"},
+        {"cinemeta:documentary-movies", "Documentary Movies", CINEMETA + "/catalog/movie/top/genre=Documentary.json"},
+        {"cinemeta:documentary-series", "Documentary Series", CINEMETA + "/catalog/series/top/genre=Documentary.json"},
+    };
+}
+
+// Bring the registry in line with the built-in table: refresh title/url of
+// known builtin rows (year roll, renames), drop builtin keys that no longer
+// exist, and append any new builtins. Addon rows are left untouched — the
+// manifest refresh owns those. Preserves user order and enabled flags.
+inline void mergeBuiltinCatalogRows() {
+    auto builtins = builtinCatalogRows();
+    auto findBuiltin = [&](const std::string& key) -> CatalogRowDef* {
+        for (auto& b : builtins)
+            if (b.key == key) return &b;
+        return nullptr;
+    };
+    std::vector<CatalogRowDef> merged;
+    std::set<std::string> seen;
+    for (auto& row : CATALOG_ROWS) {
+        if (row.key.rfind("cinemeta:", 0) == 0) {
+            CatalogRowDef* b = findBuiltin(row.key);
+            if (!b) continue;  // retired builtin
+            merged.push_back({b->key, b->title, b->url, row.enabled});
+        } else {
+            merged.push_back(row);
+        }
+        seen.insert(row.key);
+    }
+    for (auto& b : builtins)
+        if (!seen.count(b.key)) merged.push_back(b);
+    CATALOG_ROWS = std::move(merged);
+}
+
 inline std::string trimJunk(std::string s) {
     auto junk = [](char c) { return c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == '"' || c == '\''; };
     while (!s.empty() && junk(s.front())) s.erase(s.begin());
@@ -133,12 +205,16 @@ inline std::string addonConfigPath(const std::string& configDir) { return config
 inline void saveConfig(const std::string& configDir) {
     ::mkdir(configDir.c_str(), 0777);
     try {
+        nlohmann::json rows = nlohmann::json::array();
+        for (auto& r : CATALOG_ROWS)
+            rows.push_back({{"key", r.key}, {"title", r.title}, {"url", r.url}, {"enabled", r.enabled}});
         std::ofstream out(addonConfigPath(configDir));
         if (out.is_open())
             // "url" (first addon) is kept alongside "urls" so a config written
             // by this version still works if an older build reads it.
             out << nlohmann::json{{"url", STREAM_ADDONS.empty() ? "" : STREAM_ADDONS.front()},
-                       {"urls", STREAM_ADDONS}, {"poster", POSTER_TEMPLATE}, {"subtitles", SUBTITLES_ADDON}}
+                       {"urls", STREAM_ADDONS}, {"poster", POSTER_TEMPLATE}, {"subtitles", SUBTITLES_ADDON},
+                       {"catalog_addons", CATALOG_ADDONS}, {"catalog_rows", rows}}
                        .dump(2);
     } catch (const std::exception& e) {
         brls::Logger::warning("saveConfig: {}", e.what());
@@ -163,6 +239,22 @@ inline void loadAddon(const std::string& configDir) {
         }
         POSTER_TEMPLATE = normalizePosterTemplate(jstr(j, "poster"));
         SUBTITLES_ADDON = normalizeAddonUrl(jstr(j, "subtitles"));
+        CATALOG_ADDONS.clear();
+        for (auto& u : jstrlist(j, "catalog_addons")) {
+            std::string n = normalizeAddonUrl(u);
+            if (!n.empty()) CATALOG_ADDONS.push_back(n);
+        }
+        CATALOG_ROWS.clear();
+        auto it = j.find("catalog_rows");
+        if (it != j.end() && it->is_array()) {
+            for (auto& e : *it) {
+                if (!e.is_object()) continue;
+                CatalogRowDef r{jstr(e, "key"), jstr(e, "title"), jstr(e, "url"), true};
+                auto en = e.find("enabled");
+                if (en != e.end() && en->is_boolean()) r.enabled = en->get<bool>();
+                if (!r.key.empty() && !r.url.empty()) CATALOG_ROWS.push_back(r);
+            }
+        }
     } catch (const std::exception& e) {
         brls::Logger::warning("loadAddon: {}", e.what());
     }
@@ -192,7 +284,7 @@ inline void importAddonFromFile(const std::string& configDir) {
         std::ifstream in(path);
         if (!in.is_open()) continue;
 
-        std::vector<std::string> urls;
+        std::vector<std::string> urls, catalogs;
         std::string poster, subs, line;
         while (std::getline(in, line)) {
             line = trimJunk(line);
@@ -203,6 +295,10 @@ inline void importAddonFromFile(const std::string& configDir) {
                 if (!key.empty()) poster = rpdbTemplate(key);
             } else if (line.rfind("subtitles=", 0) == 0) {
                 subs = normalizeAddonUrl(line.substr(10));
+            } else if (line.rfind("catalog=", 0) == 0) {
+                std::string u = normalizeAddonUrl(line.substr(8));
+                if (!u.empty() && std::find(catalogs.begin(), catalogs.end(), u) == catalogs.end())
+                    catalogs.push_back(u);
             } else if (!line.empty() && line[0] != '#') {
                 std::string u = normalizeAddonUrl(line);
                 // Every bare URL line is an addon; skip exact repeats.
@@ -213,12 +309,16 @@ inline void importAddonFromFile(const std::string& configDir) {
 
         // The file is the source of truth: apply all values (an absent
         // rpdb/poster/subtitles line turns that feature off again). Missing
-        // addon lines never wipe a working addon list.
+        // addon/catalog lines never wipe a working list — removal is done in
+        // the Catalogs screen, not by trimming the file.
         std::vector<std::string> effective = urls.empty() ? STREAM_ADDONS : urls;
-        if (effective != STREAM_ADDONS || poster != POSTER_TEMPLATE || subs != SUBTITLES_ADDON) {
+        std::vector<std::string> effCatalogs = catalogs.empty() ? CATALOG_ADDONS : catalogs;
+        if (effective != STREAM_ADDONS || poster != POSTER_TEMPLATE || subs != SUBTITLES_ADDON ||
+            effCatalogs != CATALOG_ADDONS) {
             STREAM_ADDONS = effective;
             POSTER_TEMPLATE = poster;
             SUBTITLES_ADDON = subs;
+            CATALOG_ADDONS = effCatalogs;
             saveConfig(configDir);
             brls::Logger::info("settings imported from {}", path);
         }
@@ -284,6 +384,104 @@ struct MetaList {
     std::vector<Meta> metas;
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(MetaList, metas);
+
+// One catalog declared by an addon manifest.
+struct ManifestCatalog {
+    std::string type;  // "movie" | "series" | ...
+    std::string id;
+    std::string name;           // e.g. "Netflix"
+    bool requiresExtra = false;  // needs a search/genre parameter — not a browsable row
+};
+inline void from_json(const nlohmann::json& j, ManifestCatalog& c) {
+    c.type = jstr(j, "type");
+    c.id = jstr(j, "id");
+    c.name = jstr(j, "name");
+    auto it = j.find("extra");
+    if (it != j.end() && it->is_array())
+        for (auto& e : *it)
+            if (e.is_object() && e.value("isRequired", false)) c.requiresExtra = true;
+}
+
+// The interesting bits of an addon's /manifest.json.
+struct Manifest {
+    std::string name;
+    std::vector<ManifestCatalog> catalogs;
+};
+inline void from_json(const nlohmann::json& j, Manifest& m) {
+    m.name = jstr(j, "name");
+    m.catalogs.clear();
+    auto it = j.find("catalogs");
+    if (it != j.end() && it->is_array())
+        for (auto& e : *it)
+            if (e.is_object()) m.catalogs.push_back(e.get<ManifestCatalog>());
+}
+
+// Row title for an addon catalog: "Netflix Movies", "Trending Series"...
+// Falls back to the addon name when the catalog itself is unnamed.
+inline std::string catalogRowTitle(const Manifest& m, const ManifestCatalog& c) {
+    std::string base = c.name.empty() ? m.name : c.name;
+    if (c.type == "movie") return base + " Movies";
+    if (c.type == "series") return base + " Series";
+    return base;
+}
+
+// Fetch every configured catalog addon's manifest and sync its rows into the
+// registry: new catalogs are appended (enabled), titles/urls of known ones
+// refreshed in place (user order and toggles preserved), and rows whose
+// catalog vanished from the manifest are dropped. Offline addons keep their
+// stored rows. Fires CATALOGS_CHANGED (UI thread) when anything changed.
+inline void refreshCatalogAddons(const std::string& configDir) {
+    for (auto& base : CATALOG_ADDONS) {
+        getJSON<Manifest>(
+            [base, configDir](Manifest m) {
+                bool changed = false;
+                std::set<std::string> manifestKeys;
+                std::vector<CatalogRowDef> fresh;
+                for (auto& c : m.catalogs) {
+                    if (c.requiresExtra || c.type.empty() || c.id.empty()) continue;
+                    CatalogRowDef def{base + "|" + c.type + "|" + c.id, catalogRowTitle(m, c),
+                        base + "/catalog/" + c.type + "/" + c.id + ".json"};
+                    manifestKeys.insert(def.key);
+                    fresh.push_back(def);
+                }
+                // Refresh or drop this addon's existing rows.
+                std::vector<CatalogRowDef> merged;
+                for (auto& row : CATALOG_ROWS) {
+                    if (row.key.rfind(base + "|", 0) != 0) {
+                        merged.push_back(row);
+                        continue;
+                    }
+                    if (!manifestKeys.count(row.key)) {
+                        changed = true;  // catalog gone from the manifest
+                        continue;
+                    }
+                    for (auto& def : fresh)
+                        if (def.key == row.key) {
+                            if (def.title != row.title || def.url != row.url) changed = true;
+                            merged.push_back({def.key, def.title, def.url, row.enabled});
+                            break;
+                        }
+                }
+                // Append catalogs we haven't seen before.
+                std::set<std::string> have;
+                for (auto& row : merged) have.insert(row.key);
+                for (auto& def : fresh)
+                    if (!have.count(def.key)) {
+                        merged.push_back(def);
+                        changed = true;
+                    }
+                if (changed) {
+                    CATALOG_ROWS = std::move(merged);
+                    saveConfig(configDir);
+                    CATALOGS_CHANGED.fire();
+                }
+            },
+            [base](const std::string& err) {
+                brls::Logger::warning("catalog addon manifest {}: {}", base, err);
+            },
+            base + "/manifest.json");
+    }
+}
 
 // One subtitle offered by a subtitles addon (/subtitles/{type}/{id}.json).
 struct Subtitle {

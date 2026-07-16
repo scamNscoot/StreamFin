@@ -12,6 +12,7 @@
 #include "activity/stremio_search.hpp"
 #include "activity/stremio_favourites.hpp"
 #include "activity/stremio_resume.hpp"
+#include "activity/stremio_catalogs.hpp"
 #include "view/recycling_grid.hpp"
 #include "view/h_recycling.hpp"
 #include "view/video_card.hpp"
@@ -182,6 +183,8 @@ private:
 
 }  // namespace
 
+StremioHome::~StremioHome() { stremio::CATALOGS_CHANGED.unsubscribe(this->catalogsSub); }
+
 StremioHome::StremioHome() {
     brls::Logger::debug("StremioHome: create");
     this->setAxis(brls::Axis::COLUMN);
@@ -205,21 +208,13 @@ StremioHome::StremioHome() {
     this->addContinueRow();
     this->addFavouritesRow();
 
-    // Cinemeta catalogs: top = Popular, year = New (newest releases),
-    // imdbRating = Top Rated. The /year catalog requires a year value.
-    this->addRow("Popular Movies", stremio::CINEMETA + "/catalog/movie/top.json");
-    this->addRow("Popular Series", stremio::CINEMETA + "/catalog/series/top.json");
-    // Current year computed at runtime, so "New" auto-rolls each year (no manual edit).
-    std::time_t now = std::time(nullptr);
-    std::string year = std::to_string(1900 + std::localtime(&now)->tm_year);
-    this->addRow("New Movies", stremio::CINEMETA + "/catalog/movie/year/genre=" + year + ".json");
-    this->addRow("New Series", stremio::CINEMETA + "/catalog/series/year/genre=" + year + ".json");
-    this->addRow("Top Rated Movies", stremio::CINEMETA + "/catalog/movie/imdbRating.json");
-    this->addRow("Top Rated Series", stremio::CINEMETA + "/catalog/series/imdbRating.json");
-    this->addRow("Animation Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Animation.json");
-    this->addRow("Animation Series", stremio::CINEMETA + "/catalog/series/top/genre=Animation.json");
-    this->addRow("Documentary Movies", stremio::CINEMETA + "/catalog/movie/top/genre=Documentary.json");
-    this->addRow("Documentary Series", stremio::CINEMETA + "/catalog/series/top/genre=Documentary.json");
+    // Catalog carousels come from the persisted row registry: the built-in
+    // Cinemeta rows plus every catalog offered by the user's catalog addons
+    // (catalog=URL lines in streamfin-addon.txt), in the user's order.
+    this->buildCatalogRows();
+
+    // Manifest refreshes and Catalogs-screen edits rebuild the carousels.
+    this->catalogsSub = stremio::CATALOGS_CHANGED.subscribe([this]() { this->rebuildCatalogRows(); });
 
     // Y opens the on-screen keyboard to search Cinemeta.
     this->registerAction("Search", brls::BUTTON_Y, [](brls::View*) {
@@ -238,6 +233,12 @@ StremioHome::StremioHome() {
         promptForAddon(stremio::STREAM_ADDONS.empty() ? "" : stremio::STREAM_ADDONS.front());
         return true;
     });
+
+    // + opens the Catalogs screen: toggle home rows on/off and reorder them.
+    this->registerAction("Catalogs", brls::BUTTON_START, [](brls::View*) {
+        brls::Application::pushActivity(new brls::Activity(new StremioCatalogs()));
+        return true;
+    });
     if (stremio::STREAM_ADDONS.empty())
         brls::sync([]() { promptForAddon(""); });
 }
@@ -252,6 +253,8 @@ void StremioHome::addRow(const std::string& title, const std::string& url) {
     rec->estimatedRowWidth = 175;
     rec->registerCell("Cell", FavCardCell::create);
     this->boxHome->addView(rec);
+    this->catalogViews.push_back(header);
+    this->catalogViews.push_back(rec);
     if (!this->firstRowRec) this->firstRowRec = rec;  // safe parking spot for focus
     rec->showSkeleton(8);
 
@@ -263,6 +266,41 @@ void StremioHome::addRow(const std::string& title, const std::string& url) {
         },
         [ASYNC_TOKEN, rec](const std::string&) { ASYNC_RELEASE },
         url);
+}
+
+void StremioHome::buildCatalogRows() {
+    for (auto& def : stremio::CATALOG_ROWS)
+        if (def.enabled) this->addRow(def.title, def.url);
+}
+
+void StremioHome::rebuildCatalogRows() {
+    // Same focus-parking discipline as refreshFavourites/refreshContinue:
+    // never leave focus on a view that's about to be destroyed.
+    bool focusHere = false;
+    for (brls::View* f = brls::Application::getCurrentFocus(); f != nullptr; f = f->getParent())
+        if (std::find(this->catalogViews.begin(), this->catalogViews.end(), f) != this->catalogViews.end()) {
+            focusHere = true;
+            break;
+        }
+
+    // Build the new rows first (appended after the old ones), so there is
+    // always a live row to park focus on before the old cells are destroyed.
+    std::vector<brls::View*> old = std::move(this->catalogViews);
+    this->catalogViews.clear();
+    this->firstRowRec = nullptr;
+    this->buildCatalogRows();
+
+    if (focusHere) {
+        if (this->firstRowRec)
+            brls::Application::giveFocus(this->firstRowRec);
+        else
+            brls::Application::giveFocus(this);  // all rows toggled off
+    }
+
+    for (auto* v : old) this->boxHome->removeView(v);
+    // Force a clean relayout — stale yoga incremental layout after toggling
+    // row visibility is this screen's oldest bug (see refreshFavourites).
+    this->boxHome->invalidate();
 }
 
 void StremioHome::addFavouritesRow() {

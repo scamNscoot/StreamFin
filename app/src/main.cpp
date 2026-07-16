@@ -72,6 +72,9 @@ int main(int argc, char* argv[]) {
     // easier than typing a long URL on the on-screen keyboard.
     stremio::loadAddon(conf.configDir());
     stremio::importAddonFromFile(conf.configDir());
+    // Sync the home-row registry with this build's built-in rows (year roll,
+    // added/retired rows) before the home screen reads it.
+    stremio::mergeBuiltinCatalogRows();
 
     // Init the app and i18n
     if (!brls::Application::init()) {
@@ -111,6 +114,10 @@ int main(int argc, char* argv[]) {
     brls::Application::registerXMLView("SearchTab", SearchTab::create);
     brls::Application::registerXMLView("RemoteTab", RemoteTab::create);
     brls::Application::registerXMLView("SettingTab", SettingTab::create);
+
+    // Refresh catalog-addon manifests in the background; the home screen
+    // rebuilds its rows if anything changed (CATALOGS_CHANGED).
+    stremio::refreshCatalogAddons(conf.configDir());
 
     if (!brls::Application::getPlatform()->isApplicationMode()) {
         brls::Application::pushActivity(new HintActivity());
