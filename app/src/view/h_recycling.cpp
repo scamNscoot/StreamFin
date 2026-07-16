@@ -65,15 +65,6 @@ void HRecyclerFrame::onChildFocusGained(brls::View* directChild, brls::View* foc
     if (cellLeft - paddingLeft - target < 0) target = cellLeft - paddingLeft;  // bring in from the left
     if (target > contentWidth - visibleWidth) target = contentWidth - visibleWidth;
     if (target < 0) target = 0;
-
-    if (std::fabs(target - (float)getContentOffsetX()) < 0.5f) {
-        // No scroll needed — but the base handler already started its
-        // centered-scroll animation; kill it or the row drifts anyway
-        // (startScrolling early-returns on equal targets and would leave
-        // that animation running).
-        this->contentOffsetX.stop();
-        return;
-    }
     setContentOffsetX(target, true);
 }
 
