@@ -548,6 +548,8 @@ bool ScrollingFrame::updateScrolling(bool animated)
         // Pin the focused view to the top edge (minus the anchor offset);
         // the clamp below makes focus walk at both ends of the content.
         newScroll = localY - this->anchorOffset;
+        if (newScroll < this->anchorSnapStart)
+            newScroll = 0;  // first item: rest fully at the top
     }
     else
     {

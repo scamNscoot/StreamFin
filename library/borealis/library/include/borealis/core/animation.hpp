@@ -102,4 +102,9 @@ class Animatable : public FiniteTicking
 void updateHighlightAnimation();
 void getHighlightAnimation(float* gradient_x, float* gradient_y, float* color);
 
+// Freeze the highlight breathing pulse at full intensity (solid color1).
+// Used while carrying a row in a reorder UI so the held card's glow reads
+// as locked-on instead of fading in and out.
+void setHighlightPulseLocked(bool locked);
+
 } // namespace brls

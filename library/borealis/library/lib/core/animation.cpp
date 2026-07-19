@@ -98,6 +98,14 @@ bool Animatable::operator==(const float value)
 static double highlightGradientX = 0;
 static double highlightGradientY = 0;
 static double highlightColor     = 0;
+static bool highlightPulseLocked = false;
+
+void setHighlightPulseLocked(bool locked)
+{
+    highlightPulseLocked = locked;
+    if (locked)
+        highlightColor = 1.0;  // pin at solid color1 (full red) immediately
+}
 
 void updateHighlightAnimation()
 {
@@ -109,6 +117,8 @@ void updateHighlightAnimation()
     // Update variables
     highlightGradientX = (cos((double)currentTime / HIGHLIGHT_SPEED / 3.0) + 1.0) / 2.0;
     highlightGradientY = (sin((double)currentTime / HIGHLIGHT_SPEED / 3.0) + 1.0) / 2.0;
+    if (highlightPulseLocked)
+        return;  // carrying a row: glow stays pinned at full intensity
     // Slow breathing (~2.4s period) — the stock *2.0 phase flashed too fast
     // now that the border/glow actually change colour with it.
     highlightColor     = (sin((double)currentTime / HIGHLIGHT_SPEED / 3.0) + 1.0) / 2.0;

@@ -198,7 +198,10 @@ StremioHome::StremioHome() {
     // the screen (offset leaves its header + a little breathing room visible)
     // instead of being centered. Clamped at both ends, so the highlight walks
     // on the last rows rather than the page over-scrolling.
-    scroll->setScrollingAnchored(true, 64);
+    // snapStart 200: any target inside the first row block rests at scroll 0,
+    // so the top row keeps its full header + breathing room (offset 64 alone
+    // left the page 27px up with the header clipped against the screen edge).
+    scroll->setScrollingAnchored(true, 64, 200);
 
     this->boxHome = new brls::Box();
     this->boxHome->setAxis(brls::Axis::COLUMN);

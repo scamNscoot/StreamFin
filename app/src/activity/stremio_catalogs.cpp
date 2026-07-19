@@ -188,6 +188,7 @@ public:
 StremioCatalogs::StremioCatalogs() {
     dirty = false;
     heldIndex = -1;
+    brls::setHighlightPulseLocked(false);
 
     this->setAxis(brls::Axis::COLUMN);
     this->setDimensions(brls::Application::contentWidth, brls::Application::contentHeight);
@@ -271,6 +272,8 @@ StremioCatalogs::StremioCatalogs() {
             cell->setHeld(false);
             heldIndex = -1;
         }
+        // Holding = the glow locks on solid; placing lets it breathe again.
+        brls::setHighlightPulseLocked(heldIndex >= 0);
     };
     this->registerAction("Pick Up / Place", brls::BUTTON_X, [pickUpOrPlace](brls::View*) {
         pickUpOrPlace();
@@ -284,6 +287,7 @@ StremioCatalogs::StremioCatalogs() {
 
     this->registerAction("hints/back"_i18n, brls::BUTTON_B, [](brls::View*) {
         heldIndex = -1;  // B always places first — the order so far is already applied
+        brls::setHighlightPulseLocked(false);
         if (dirty) {
             stremio::saveConfig(AppConfig::instance().configDir());
             stremio::CATALOGS_CHANGED.fire();

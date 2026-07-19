@@ -98,11 +98,15 @@ class ScrollingFrame : public Box
      * keeping the focused view in the middle, scroll so it sits at the top
      * edge minus anchorOffset, clamped to the content bounds. The clamping
      * means focus visibly walks at both ends of the content — TV-style rows.
+     * A target closer to the start than snapStart rests at 0 instead, so the
+     * first item doesn't leave the page slightly scrolled with the top
+     * content clipped.
      */
-    void setScrollingAnchored(bool anchored, float offset = 0.0f)
+    void setScrollingAnchored(bool anchored, float offset = 0.0f, float snapStart = 0.0f)
     {
         anchoredScrolling = anchored;
         anchorOffset      = offset;
+        anchorSnapStart   = snapStart;
     }
 
     static View* create();
@@ -134,6 +138,7 @@ class ScrollingFrame : public Box
     ScrollingBehavior behavior = ScrollingBehavior::NATURAL;
     bool anchoredScrolling     = false;
     float anchorOffset         = 0.0f;
+    float anchorSnapStart      = 0.0f;
     bool naturalScrollingCanScroll = false;
     void naturalScrollingBehaviour();
     void naturalScrollingButtonProcessing(FocusDirection focusDirection, bool* repeat);
