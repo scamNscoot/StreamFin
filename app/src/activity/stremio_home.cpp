@@ -194,6 +194,11 @@ StremioHome::StremioHome() {
     auto* scroll = new brls::ScrollingFrame();
     scroll->setGrow(1.0f);
     scroll->setScrollingIndicatorVisible(false);
+    // TV-style vertical scrolling: the focused row is pinned near the top of
+    // the screen (offset leaves its header + a little breathing room visible)
+    // instead of being centered. Clamped at both ends, so the highlight walks
+    // on the last rows rather than the page over-scrolling.
+    scroll->setScrollingAnchored(true, 64);
 
     this->boxHome = new brls::Box();
     this->boxHome->setAxis(brls::Axis::COLUMN);
@@ -251,6 +256,9 @@ void StremioHome::addRow(const std::string& title, const std::string& url) {
     auto* rec = new HRecyclerFrame();
     rec->setHeight(300);
     rec->estimatedRowWidth = 175;
+    // Posters slide under a left-anchored highlight; the highlight itself only
+    // walks at the ends of the row where the clamp stops the content moving.
+    rec->setScrollingAnchored(true);
     rec->registerCell("Cell", FavCardCell::create);
     this->boxHome->addView(rec);
     this->catalogViews.push_back(header);
@@ -351,6 +359,7 @@ void StremioHome::addFavouritesRow() {
     this->favRec = new HRecyclerFrame();
     this->favRec->setHeight(300);
     this->favRec->estimatedRowWidth = 175;
+    this->favRec->setScrollingAnchored(true);
     this->favRec->registerCell("Cell", FavCardCell::create);
     this->boxHome->addView(this->favRec);
 
@@ -397,6 +406,7 @@ void StremioHome::addContinueRow() {
     this->continueRec = new HRecyclerFrame();
     this->continueRec->setHeight(300);
     this->continueRec->estimatedRowWidth = 175;
+    this->continueRec->setScrollingAnchored(true);
     this->continueRec->registerCell("Cell", FavCardCell::create);
     this->boxHome->addView(this->continueRec);
 

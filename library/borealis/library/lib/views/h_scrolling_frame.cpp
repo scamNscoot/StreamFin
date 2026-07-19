@@ -543,8 +543,18 @@ bool HScrollingFrame::updateScrolling(bool animated)
         parent = parent->getParent();
     }
 
-    int currentSelectionMiddleOnScreen = localX + focusedView->getWidth() / 2;
-    float newScroll                    = currentSelectionMiddleOnScreen - this->getWidth() / 2;
+    float newScroll;
+    if (this->anchoredScrolling)
+    {
+        // Pin the focused view to the left edge (minus the anchor offset);
+        // the clamp below makes focus walk at both ends of the row.
+        newScroll = localX - this->anchorOffset;
+    }
+    else
+    {
+        int currentSelectionMiddleOnScreen = localX + focusedView->getWidth() / 2;
+        newScroll                          = currentSelectionMiddleOnScreen - this->getWidth() / 2;
+    }
 
     float contentWidth = this->getContentWidth();
     float rightLimit   = contentWidth - this->getScrollingAreaWidth();

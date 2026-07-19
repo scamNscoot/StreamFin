@@ -138,6 +138,11 @@ public:
 
     View* getNextCellFocus(brls::FocusDirection direction, View* currentView) override;
 
+    // Optional hook consulted before normal cell navigation. Return a view to
+    // take over the move (used by the Catalogs screen to carry a held row with
+    // up/down), or nullptr to fall through to stock navigation.
+    std::function<brls::View*(brls::FocusDirection, brls::View*)> cellNavigationInterceptor = nullptr;
+
     void forceRequestNextPage();
 
     void onLayout() override;

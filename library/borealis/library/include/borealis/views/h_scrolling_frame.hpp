@@ -81,6 +81,18 @@ class HScrollingFrame : public Box
         showScrollingIndicator = visible;
     }
 
+    /**
+     * Anchored scrolling (only meaningful with CENTERED behavior): instead of
+     * keeping the focused view in the middle, scroll so it sits at the left
+     * edge minus anchorOffset, clamped to the content bounds. The clamping
+     * means focus visibly walks at both ends of the row — TV-style carousels.
+     */
+    void setScrollingAnchored(bool anchored, float offset = 0.0f)
+    {
+        anchoredScrolling = anchored;
+        anchorOffset      = offset;
+    }
+
     static View* create();
 
   private:
@@ -108,6 +120,8 @@ class HScrollingFrame : public Box
     float getContentWidth();
 
     ScrollingBehavior behavior = ScrollingBehavior::NATURAL;
+    bool anchoredScrolling     = false;
+    float anchorOffset         = 0.0f;
     bool naturalScrollingCanScroll = false;
     void naturalScrollingBehaviour();
     void naturalScrollingButtonProcessing(FocusDirection focusDirection, bool* repeat);

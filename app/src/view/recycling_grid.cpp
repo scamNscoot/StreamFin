@@ -567,6 +567,11 @@ float RecyclingGrid::getHeightByCellIndex(size_t index, size_t start) {
 void RecyclingGrid::forceRequestNextPage() { this->requestNextPage = false; }
 
 brls::View* RecyclingGrid::getNextCellFocus(brls::FocusDirection direction, brls::View* currentView) {
+    if (this->cellNavigationInterceptor) {
+        brls::View* intercepted = this->cellNavigationInterceptor(direction, currentView);
+        if (intercepted) return intercepted;
+    }
+
     void* parentUserData = currentView->getParentUserData();
 
     // Allow up and down when axis is ROW

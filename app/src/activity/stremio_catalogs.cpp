@@ -19,6 +19,10 @@ namespace {
 // One edit was made since the screen opened (drives save-on-exit).
 bool dirty = false;
 
+// Index of the row currently picked up with X (-1 = none). While a row is
+// held, up/down carries it through the list instead of moving the highlight.
+int heldIndex = -1;
+
 std::string sourceOf(const stremio::CatalogRowDef& def) {
     if (def.key.rfind("cinemeta:", 0) == 0) return "Cinemeta";
     // Host part of the catalog URL, so rows from different addons are
@@ -139,6 +143,14 @@ public:
         this->handle->setAlpha(def.enabled ? 1.0f : 0.45f);
     }
 
+    // Carry styling: red-tinted card while the row is picked up — the locked
+    // focus highlight plus this tint reads as "you are holding this".
+    void setHeld(bool held) {
+        NVGcolor c = brls::Application::getTheme()["color/surface"];
+        if (held) c = nvgLerpRGBA(c, nvgRGB(245, 33, 42), 0.22f);
+        this->setBackgroundColor(c);
+    }
+
     brls::Label* name = nullptr;
     brls::Label* detail = nullptr;
     ToggleSwitch* toggle = nullptr;
@@ -152,11 +164,13 @@ public:
     RecyclingGridItem* cellForRow(RecyclingView* recycler, size_t index) override {
         CatalogCell* cell = dynamic_cast<CatalogCell*>(recycler->dequeueReusableCell("Cell"));
         cell->apply(stremio::CATALOG_ROWS.at(index), false);
+        cell->setHeld((int)index == heldIndex);
         return cell;
     }
 
     // A = toggle on/off. The cell is updated in place — no reload, focus stays.
     void onItemSelected(brls::Box* recycler, size_t index) override {
+        if (heldIndex >= 0) return;  // A is inert while carrying a row
         auto& def = stremio::CATALOG_ROWS.at(index);
         def.enabled = !def.enabled;
         dirty = true;
@@ -173,6 +187,7 @@ public:
 
 StremioCatalogs::StremioCatalogs() {
     dirty = false;
+    heldIndex = -1;
 
     this->setAxis(brls::Axis::COLUMN);
     this->setDimensions(brls::Application::contentWidth, brls::Application::contentHeight);
@@ -187,7 +202,7 @@ StremioCatalogs::StremioCatalogs() {
 
     auto* hint = new brls::Label();
     hint->setFontSize(18);
-    hint->setText("Rows appear on the home screen in this order · add catalog addons with catalog=URL lines in streamfin-addon.txt");
+    hint->setText("Rows appear on the home screen in this order · X picks a row up, carry it with up/down, Y places it · add catalog addons with catalog=URL lines in streamfin-addon.txt");
     hint->setMarginBottom(12);
     this->addView(hint);
 
@@ -203,32 +218,72 @@ StremioCatalogs::StremioCatalogs() {
 
     brls::sync([this]() { brls::Application::giveFocus(this->recycler); });
 
-    // Move the focused row up/down. Rebuild the list with focus parked on the
-    // row's new position (same select-after-reload dance the picker uses).
-    auto move = [this](int delta) {
-        brls::View* f = brls::Application::getCurrentFocus();
-        auto* cell = dynamic_cast<RecyclingGridItem*>(f);
-        if (!cell) return;
+    // Grab-and-carry reorder: X picks the focused row up; while held, up/down
+    // (d-pad or left stick — both arrive here as focus navigation) carries it
+    // through the list; Y or X places it. The interceptor swaps the DATA of
+    // adjacent rows in place and hands focus to the neighbouring cell, so the
+    // tinted card + highlight track the carried row with the normal focus
+    // animation — no reload, no focus parking in the common case.
+    this->recycler->cellNavigationInterceptor = [this](brls::FocusDirection dir,
+                                                    brls::View* current) -> brls::View* {
+        if (heldIndex < 0) return nullptr;  // not carrying: stock navigation
+        auto* cell = dynamic_cast<CatalogCell*>(current);
+        if (!cell) return nullptr;
+        if (dir != brls::FocusDirection::UP && dir != brls::FocusDirection::DOWN)
+            return current;  // no sideways escape while carrying
         size_t i = cell->getIndex();
         auto& rows = stremio::CATALOG_ROWS;
-        if (delta < 0 && i == 0) return;
-        if (delta > 0 && i + 1 >= rows.size()) return;
-        std::swap(rows[i], rows[i + delta]);
+        int t = (int)i + (dir == brls::FocusDirection::DOWN ? 1 : -1);
+        if (t < 0 || t >= (int)rows.size()) {
+            current->shakeHighlight(dir);  // top/bottom of the list: stay put
+            return current;
+        }
+        std::swap(rows[i], rows[t]);
         dirty = true;
-        this->recycler->setDefaultCellFocus(i + delta);
+        heldIndex = t;
+        auto* from = dynamic_cast<CatalogCell*>(this->recycler->getGridItemByIndex(i));
+        auto* to = dynamic_cast<CatalogCell*>(this->recycler->getGridItemByIndex(t));
+        if (from) {
+            from->apply(rows[i], false);
+            from->setHeld(false);
+        }
+        if (to) {
+            to->apply(rows[t], false);
+            to->setHeld(true);
+            return to;
+        }
+        // Neighbour cell not instantiated (recycled off-screen): rebuild with
+        // focus parked on the row's new position (the old select-after-reload
+        // dance), held styling reapplied by cellForRow.
+        this->recycler->setDefaultCellFocus(t);
         this->recycler->reloadData();
         brls::sync([this]() { brls::Application::giveFocus(this->recycler); });
+        return current;
     };
-    this->registerAction("Move Up", brls::BUTTON_X, [move](brls::View*) {
-        move(-1);
+
+    auto pickUpOrPlace = []() {
+        auto* cell = dynamic_cast<CatalogCell*>(brls::Application::getCurrentFocus());
+        if (!cell) return;
+        if (heldIndex < 0) {
+            heldIndex = (int)cell->getIndex();
+            cell->setHeld(true);
+        } else {
+            cell->setHeld(false);
+            heldIndex = -1;
+        }
+    };
+    this->registerAction("Pick Up / Place", brls::BUTTON_X, [pickUpOrPlace](brls::View*) {
+        pickUpOrPlace();
         return true;
     });
-    this->registerAction("Move Down", brls::BUTTON_Y, [move](brls::View*) {
-        move(+1);
+    this->registerAction("Place", brls::BUTTON_Y, [pickUpOrPlace](brls::View*) {
+        if (heldIndex < 0) return false;  // Y only acts while carrying
+        pickUpOrPlace();
         return true;
     });
 
     this->registerAction("hints/back"_i18n, brls::BUTTON_B, [](brls::View*) {
+        heldIndex = -1;  // B always places first — the order so far is already applied
         if (dirty) {
             stremio::saveConfig(AppConfig::instance().configDir());
             stremio::CATALOGS_CHANGED.fire();

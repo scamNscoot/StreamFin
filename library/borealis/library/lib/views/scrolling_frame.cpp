@@ -542,8 +542,18 @@ bool ScrollingFrame::updateScrolling(bool animated)
         parent = parent->getParent();
     }
 
-    int currentSelectionMiddleOnScreen = localY + itemHeight / 2;
-    float newScroll                    = currentSelectionMiddleOnScreen - this->getHeight() / 2;
+    float newScroll;
+    if (this->anchoredScrolling)
+    {
+        // Pin the focused view to the top edge (minus the anchor offset);
+        // the clamp below makes focus walk at both ends of the content.
+        newScroll = localY - this->anchorOffset;
+    }
+    else
+    {
+        int currentSelectionMiddleOnScreen = localY + itemHeight / 2;
+        newScroll                          = currentSelectionMiddleOnScreen - this->getHeight() / 2;
+    }
 
     float contentHeight = this->getContentHeight();
     float bottomLimit   = contentHeight - this->getScrollingAreaHeight();
