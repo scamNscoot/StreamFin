@@ -343,9 +343,11 @@ void StremioHome::rebuildCatalogRows() {
 void StremioHome::onChildFocusGained(brls::View* directChild, brls::View* focusedView) {
     brls::Box::onChildFocusGained(directChild, focusedView);
     // Focus coming back into home (e.g. the Catalogs screen was just popped)
-    // with a deferred registry change: rebuild now. Next frame, so the
-    // focus restore fully settles first.
+    // with deferred changes: apply them now. Next frame, so the focus
+    // restore fully settles first.
     if (this->pendingRebuild) brls::sync([this]() { this->rebuildCatalogRows(); });
+    if (this->pendingFavRefresh) brls::sync([this]() { this->refreshFavourites(); });
+    if (this->pendingContinueRefresh) brls::sync([this]() { this->refreshContinue(); });
 }
 
 void StremioHome::addFavouritesRow() {
@@ -368,6 +370,18 @@ void StremioHome::addFavouritesRow() {
 }
 
 void StremioHome::refreshFavourites() {
+    // Never toggle row visibility while another activity is on top: the
+    // relayout resolves against stale state and everything except this row's
+    // header comes back shifted a full padding-width right (the "double
+    // indent" bug's latest variant — favouriting from the detail screen).
+    // Defer, like rebuildCatalogRows; onChildFocusGained runs it on return.
+    auto stack = brls::Application::getActivitiesStack();
+    if (!stack.empty() && this->getParentActivity() != stack.back()) {
+        this->pendingFavRefresh = true;
+        return;
+    }
+    this->pendingFavRefresh = false;
+
     // Same focus-parking dance as refreshContinue(): if focus is inside this
     // row, park it on a stable row BEFORE the cells are destroyed, or the
     // focus highlight is left stranded at stale coordinates.
@@ -410,6 +424,15 @@ void StremioHome::addContinueRow() {
 }
 
 void StremioHome::refreshContinue() {
+    // Deferred while covered, same as refreshFavourites — this refresh often
+    // fires right when playback ends, with the player still on top.
+    auto stack = brls::Application::getActivitiesStack();
+    if (!stack.empty() && this->getParentActivity() != stack.back()) {
+        this->pendingContinueRefresh = true;
+        return;
+    }
+    this->pendingContinueRefresh = false;
+
     // Was focus inside this row? (true when the user just cleared an item;
     // false when the row is refreshing because playback stopped elsewhere.)
     bool focusHere = false;

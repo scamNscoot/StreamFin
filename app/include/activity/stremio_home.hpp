@@ -37,5 +37,7 @@ private:
     std::vector<brls::View*> catalogViews;      // headers + carousels of the catalog rows
     brls::Event<>::Subscription catalogsSub;    // CATALOGS_CHANGED subscription (always set in ctor)
     bool pendingRebuild = false;            // registry changed while home was covered
+    bool pendingFavRefresh = false;         // favourites changed while home was covered
+    bool pendingContinueRefresh = false;    // continue-watching changed while home was covered
     bool continueEnriching = false;         // a Cinemeta title-refresh pass is in flight
 };
