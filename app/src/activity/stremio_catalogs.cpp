@@ -54,12 +54,16 @@ public:
         }
     }
 
+    // On a full-red held card the normal red "on" track would vanish — swap
+    // to darker red / translucent white so the switch stays readable.
+    void setOnRedCard(bool v) { this->onRedCard = v; }
+
     void draw(NVGcontext* vg, float x, float y, float width, float height, brls::Style style,
         brls::FrameContext* ctx) override {
         float t = this->anim;
         // Track: grey when off, brand red when on.
-        NVGcolor off = nvgRGB(120, 120, 128);
-        NVGcolor on = nvgRGB(245, 33, 42);
+        NVGcolor off = this->onRedCard ? nvgRGBA(255, 255, 255, 110) : nvgRGB(120, 120, 128);
+        NVGcolor on = this->onRedCard ? nvgRGB(128, 9, 15) : nvgRGB(245, 33, 42);
         NVGcolor track = nvgRGBAf(off.r + (on.r - off.r) * t, off.g + (on.g - off.g) * t,
             off.b + (on.b - off.b) * t, this->getAlpha());
         nvgBeginPath(vg);
@@ -77,6 +81,7 @@ public:
 
 private:
     brls::Animatable anim = 0.0f;
+    bool onRedCard = false;
 };
 
 // Burger drag-handle: three grey bars, the universal "this row can be moved"
@@ -143,12 +148,21 @@ public:
         this->handle->setAlpha(def.enabled ? 1.0f : 0.45f);
     }
 
-    // Carry styling: red-tinted card while the row is picked up — the locked
-    // focus highlight plus this tint reads as "you are holding this".
+    // Carry styling: the picked-up card goes FULL brand red (Jay's spec —
+    // unmistakable, and it stays red until placed with X/Y) with white text
+    // for contrast. The locked highlight pulse does the rest.
     void setHeld(bool held) {
-        NVGcolor c = brls::Application::getTheme()["color/surface"];
-        if (held) c = nvgLerpRGBA(c, nvgRGB(245, 33, 42), 0.22f);
-        this->setBackgroundColor(c);
+        brls::Theme theme = brls::Application::getTheme();
+        if (held) {
+            this->setBackgroundColor(nvgRGB(245, 33, 42));
+            this->name->setTextColor(nvgRGB(255, 255, 255));
+            this->detail->setTextColor(nvgRGBA(255, 235, 236, 220));
+        } else {
+            this->setBackgroundColor(theme["color/surface"]);
+            this->name->setTextColor(theme["brls/text"]);
+            this->detail->setTextColor(theme["font/grey"]);
+        }
+        this->toggle->setOnRedCard(held);
     }
 
     brls::Label* name = nullptr;
